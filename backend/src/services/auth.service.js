@@ -12,8 +12,11 @@ export class AuthService {
 
     const passwordHash = await hashPassword(password);
 
+    const uuid = globalThis.crypto?.randomUUID?.();
+    if (!uuid) throw this._err(500, "No se pudo generar un ID seguro.");
+
     const user = {
-      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+      id: uuid,
       name,
       email,
       passwordHash,

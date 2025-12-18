@@ -1,6 +1,9 @@
 import { Router } from "express";
 
+import { env } from "../config/env.js";
+
 import { InMemoryUserRepository } from "../repositories/inmemory.user.repository.js";
+import { SqlServerUserRepository } from "../repositories/sqlserver.user.repository.js";
 import { AuthService } from "../services/auth.service.js";
 import { makeAuthController } from "../controllers/auth.controller.js";
 import { makeAuthRoutes } from "./auth.routes.js";
@@ -13,7 +16,10 @@ import { makeTeamRoutes } from "./team.routes.js";
 const router = Router();
 
 // AUTH
-const userRepo = new InMemoryUserRepository([]);
+const userRepo =
+  String(env.userRepository).toLowerCase() === "sqlserver"
+    ? new SqlServerUserRepository()
+    : new InMemoryUserRepository([]);
 const authService = new AuthService(userRepo);
 const authController = makeAuthController(authService);
 router.use("/auth", makeAuthRoutes(authController));
