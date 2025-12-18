@@ -1,0 +1,176 @@
+import React, { useMemo, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { getSession, logout } from "../services/auth";
+import {
+  Box,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  AppBar,
+  Typography,
+  IconButton,
+  Divider,
+  Chip,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import GroupsIcon from "@mui/icons-material/Groups";
+import LogoutIcon from "@mui/icons-material/Logout";
+
+const drawerWidth = 260;
+
+function NavItem({ to, icon, label, end }) {
+  return (
+    <ListItemButton
+      component={NavLink}
+      to={to}
+      end={end}
+      sx={{
+        mx: 1,
+        my: 0.5,
+        borderRadius: 2,
+        "&.active": {
+          backgroundColor: "rgba(255,255,255,0.08)",
+        },
+      }}
+    >
+      <ListItemIcon sx={{ minWidth: 40 }}>{icon}</ListItemIcon>
+      <ListItemText primary={label} />
+    </ListItemButton>
+  );
+}
+
+export default function AppShell() {
+  const session = getSession();
+  const role = session?.role || "—";
+  const isAdmin = useMemo(() => role === "ADMIN", [role]);
+  const isEngineer = useMemo(() => role === "ENGINEER", [role]);
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const onLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const drawer = (
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Toolbar sx={{ px: 2 }}>
+        <Box sx={{ flex: 1 }}>
+          <Typography fontWeight={900} letterSpacing={0.2}>
+            F1 Garage
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Manager
+          </Typography>
+        </Box>
+        <Chip size="small" label={role} />
+      </Toolbar>
+
+      <Divider />
+
+      <List sx={{ py: 1 }}>
+        <NavItem to="/dashboard" end icon={<DashboardIcon />} label="Dashboard" />
+
+        {(isAdmin || isEngineer) && (
+          <NavItem to="/teams" icon={<GroupsIcon />} label="Equipos" />
+        )}
+      </List>
+
+      <Box sx={{ flex: 1 }} />
+
+      <Divider />
+      <List sx={{ py: 1 }}>
+        <ListItemButton onClick={onLogout} sx={{ mx: 1, my: 0.5, borderRadius: 2 }}>
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <LogoutIcon />
+          </ListItemIcon>
+          <ListItemText primary="Logout" />
+        </ListItemButton>
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      {/* Top bar */}
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          zIndex: (t) => t.zIndex.drawer + 1,
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          backgroundColor: "rgba(17, 24, 35, 0.7)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setMobileOpen((v) => !v)}
+            sx={{ mr: 2, display: { sm: "none" } }}
+            aria-label="open drawer"
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Typography fontWeight={800} sx={{ flex: 1 }}>
+            Hola, {session?.name || "—"}
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* Sidebar (desktop) */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: "none", sm: "block" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+          },
+        }}
+        open
+      >
+        {drawer}
+      </Drawer>
+
+      {/* Sidebar (mobile) */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        sx={{
+          display: { xs: "block", sm: "none" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
+        }}
+        ModalProps={{ keepMounted: true }}
+      >
+        {drawer}
+      </Drawer>
+
+      {/* Main content */}
+      <Box
+        component="main"
+        sx={{
+          flex: 1,
+          p: 3,
+          pt: 10, // espacio por AppBar
+          background:
+            "radial-gradient(1200px circle at 20% 10%, rgba(255,30,30,0.10), transparent 55%), radial-gradient(900px circle at 80% 30%, rgba(0,200,255,0.08), transparent 60%)",
+        }}
+      >
+        <Outlet />
+      </Box>
+    </Box>
+  );
+}
