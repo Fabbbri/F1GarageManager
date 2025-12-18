@@ -52,7 +52,7 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 2. (Si no existe) Crear base de datos:
 	- Click derecho en **Databases** → **New Database...** → nombre: `F1GarageManager` → OK.
 3. Ejecutar el script de usuarios:
-	- Abrí el archivo `backend/sql/001_users.sql` en SSMS.
+	- Abrí el archivo `database/schema/001_users.sql` en SSMS.
 	- Seleccioná la BD `F1GarageManager` en el desplegable (arriba) o ejecutá: `USE F1GarageManager;`.
 	- Ejecutá (F5). Esto crea la tabla `dbo.Users` y stored procedures.
 
@@ -121,7 +121,7 @@ IF DB_ID(N'F1GarageManager') IS NULL
 GO
 ```
 3. Ejecutar el script:
-	- Abrir `backend/sql/001_users.sql`
+	- Abrir `database/schema/001_users.sql`
 	- Ejecutar (F5) apuntando a la BD `F1GarageManager`
 
 ### B) Habilitar TCP/IP (para Node)
