@@ -1,7 +1,7 @@
 # F1GarageManager 🏎️
 
 F1GarageManager es una aplicación web para la **gestión de equipos de Fórmula 1**, que permite administrar escuderías, presupuestos, patrocinadores, inventario, carros y conductores.  
-El proyecto está dividido en **frontend (React)** y **backend (Node.js + Express)**, comunicándose mediante una **API REST**.
+El proyecto está dividido en **frontend (React)** y **backend (Node.js)**, comunicándose mediante una **API REST**.
 
 ---
 
