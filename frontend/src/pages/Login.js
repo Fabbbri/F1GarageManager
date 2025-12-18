@@ -99,7 +99,7 @@ export default function Login() {
             <br />
             F1 Garage Manager es una plataforma de gestión de equipos de Fórmula 1
             que permite administrar escuderías, presupuestos, patrocinadores,
-            carros, inventario y conductores desde un solo sistema.
+            carros, inventario y conductores desde una sola web.
           </Typography>
         </Box>
       </Stack>
