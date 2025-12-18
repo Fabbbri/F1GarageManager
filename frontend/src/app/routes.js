@@ -29,11 +29,10 @@ export default function AppRoutes() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/teams" element={<Teams />} />
+        <Route path="/teams/:id" element={<TeamDetail />} />
       </Route>
 
       <Route path="*" element={<div style={{ padding: 24 }}>404</div>} />
-
-      <Route path="/teams/:id" element={<TeamDetail />} />
 
     </Routes>
   );

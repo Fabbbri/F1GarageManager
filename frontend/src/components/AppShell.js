@@ -21,8 +21,9 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 const drawerWidth = 260;
+const drawerCollapsedWidth = 72;
 
-function NavItem({ to, icon, label, end }) {
+function NavItem({ to, icon, label, end, collapsed }) {
   return (
     <ListItemButton
       component={NavLink}
@@ -32,13 +33,16 @@ function NavItem({ to, icon, label, end }) {
         mx: 1,
         my: 0.5,
         borderRadius: 2,
+        justifyContent: collapsed ? "center" : "flex-start",
         "&.active": {
           backgroundColor: "rgba(255,255,255,0.08)",
         },
       }}
     >
-      <ListItemIcon sx={{ minWidth: 40 }}>{icon}</ListItemIcon>
-      <ListItemText primary={label} />
+      <ListItemIcon sx={{ minWidth: collapsed ? "auto" : 40, justifyContent: "center" }}>
+        {icon}
+      </ListItemIcon>
+      <ListItemText primary={label} sx={{ display: collapsed ? "none" : "block" }} />
     </ListItemButton>
   );
 }
@@ -50,6 +54,7 @@ export default function AppShell() {
   const isEngineer = useMemo(() => role === "ENGINEER", [role]);
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopHover, setDesktopHover] = useState(false);
   const navigate = useNavigate();
 
   const onLogout = () => {
@@ -57,27 +62,64 @@ export default function AppShell() {
     navigate("/login");
   };
 
+  const desktopCollapsed = !desktopHover;
+
   const drawer = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Spacer so the fixed AppBar doesn't cover drawer content */}
+      <Toolbar />
+
       <Toolbar sx={{ px: 2 }}>
-        <Box sx={{ flex: 1 }}>
-          <Typography fontWeight={900} letterSpacing={0.2}>
-            F1 Garage
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography fontWeight={900} letterSpacing={0.2} noWrap sx={{ minWidth: 0 }}>
+            F1
+            <Box
+              component="span"
+              sx={{
+                display: "inline-block",
+                overflow: "hidden",
+                verticalAlign: "bottom",
+                maxWidth: desktopCollapsed ? 0 : 140,
+                opacity: desktopCollapsed ? 0 : 1,
+                transition: "max-width 180ms ease, opacity 180ms ease",
+              }}
+            >
+              {" "}Garage
+            </Box>
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap
+            sx={{
+              opacity: desktopCollapsed ? 0 : 1,
+              transform: desktopCollapsed ? "translateY(-2px)" : "translateY(0)",
+              transition: "opacity 180ms ease, transform 180ms ease",
+            }}
+          >
             Manager
           </Typography>
         </Box>
-        <Chip size="small" label={role} />
+        <Box
+          sx={{
+            overflow: "hidden",
+            width: desktopCollapsed ? 0 : "auto",
+            opacity: desktopCollapsed ? 0 : 1,
+            transition: "opacity 180ms ease",
+          }}
+        >
+          <Chip size="small" label={role} />
+        </Box>
       </Toolbar>
 
       <Divider />
 
       <List sx={{ py: 1 }}>
-        <NavItem to="/dashboard" end icon={<DashboardIcon />} label="Dashboard" />
+        <NavItem to="/dashboard" end icon={<DashboardIcon />} label="Dashboard" collapsed={desktopCollapsed} />
 
         {(isAdmin || isEngineer) && (
-          <NavItem to="/teams" icon={<GroupsIcon />} label="Equipos" />
+          <NavItem to="/teams" icon={<GroupsIcon />} label="Equipos" collapsed={desktopCollapsed} />
         )}
       </List>
 
@@ -89,7 +131,7 @@ export default function AppShell() {
           <ListItemIcon sx={{ minWidth: 40 }}>
             <LogoutIcon />
           </ListItemIcon>
-          <ListItemText primary="Logout" />
+          <ListItemText primary="Logout" sx={{ display: desktopCollapsed ? "none" : "block" }} />
         </ListItemButton>
       </List>
     </Box>
@@ -131,10 +173,16 @@ export default function AppShell() {
         sx={{
           display: { xs: "none", sm: "block" },
           "& .MuiDrawer-paper": {
-            width: drawerWidth,
+            width: desktopCollapsed ? drawerCollapsedWidth : drawerWidth,
             boxSizing: "border-box",
             borderRight: "1px solid rgba(255,255,255,0.08)",
+            overflowX: "hidden",
+            transition: "width 180ms ease",
           },
+        }}
+        PaperProps={{
+          onMouseEnter: () => setDesktopHover(true),
+          onMouseLeave: () => setDesktopHover(false),
         }}
         open
       >

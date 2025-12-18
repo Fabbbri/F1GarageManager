@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import {
   getTeam, patchBudget,
   addSponsor, deleteSponsor,
@@ -11,7 +10,7 @@ import {
 } from "../services/teams";
 import { getSession } from "../services/auth";
 import {
-  Box, Card, CardContent, Typography, Tabs, Tab, Stack, TextField, Button, Alert, Divider
+  Box, Card, CardContent, Typography, Tabs, Tab, Stack, TextField, Button, Alert, Divider, CircularProgress
 } from "@mui/material";
 
 function Section({ title, children }) {
@@ -72,7 +71,12 @@ export default function TeamDetail() {
 
   useEffect(() => { reload(); }, [id]);
 
-  if (loading) return <Typography> Cargando...</Typography>;
+  if (loading)
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+        <CircularProgress size={28} />
+      </Box>
+    );
   if (!team) return <Alert severity="error">{error || "Equipo no encontrado"}</Alert>;
 
   const onBudget = async (e) => {
@@ -124,19 +128,6 @@ export default function TeamDetail() {
 
   return (
     <Box>
-      {/* Outside the centered container */}
-      <Box sx={{ px: { xs: 2, sm: 3 }, pt: 1 }}>
-        <Button
-          variant="text"
-          size="small"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/teams")}
-          sx={{ textTransform: "none", fontWeight: 800 }}
-        >
-          Regresar
-        </Button>
-      </Box>
-
       <Box sx={{ maxWidth: 1100, mx: "auto" }}>
         <Stack spacing={2}>
 
