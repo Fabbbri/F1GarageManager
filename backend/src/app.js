@@ -30,8 +30,21 @@ export function createApp() {
   app.get(
     "/health/db",
     asyncHandler(async (req, res) => {
-      if (String(env.userRepository).toLowerCase() !== "sqlserver") {
-        return res.json({ ok: true, db: { enabled: false, repository: env.userRepository } });
+      const usesDb =
+        String(env.userRepository).toLowerCase() === "sqlserver" ||
+        String(env.teamRepository).toLowerCase() === "sqlserver";
+
+      if (!usesDb) {
+        return res.json({
+          ok: true,
+          db: {
+            enabled: false,
+            repositories: {
+              user: env.userRepository,
+              team: env.teamRepository,
+            },
+          },
+        });
       }
 
       const pool = await getSqlPool();
@@ -39,7 +52,17 @@ export function createApp() {
         "SELECT @@SERVERNAME AS serverName, DB_NAME() AS databaseName;"
       );
 
-      return res.json({ ok: true, db: { enabled: true, ...result.recordset?.[0] } });
+      return res.json({
+        ok: true,
+        db: {
+          enabled: true,
+          repositories: {
+            user: env.userRepository,
+            team: env.teamRepository,
+          },
+          ...result.recordset?.[0],
+        },
+      });
     })
   );
 

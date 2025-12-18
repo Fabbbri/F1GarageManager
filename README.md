@@ -56,6 +56,11 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 	- Seleccioná la BD `F1GarageManager` en el desplegable (arriba) o ejecutá: `USE F1GarageManager;`.
 	- Ejecutá (F5). Esto crea la tabla `dbo.Users` y stored procedures.
 
+4. Ejecutar el script de equipos (relacional, sin JSON):
+	- Abrí el archivo `database/schema/003_teams_relational.sql` en SSMS.
+	- Seleccioná la BD `F1GarageManager`.
+	- Ejecutá (F5). Esto crea/ajusta tablas `dbo.Teams` + tablas hijas y stored procedures `dbo.Team_*`.
+
 ### 2) Habilitar conexión TCP (para que Node conecte)
 > SSMS a veces conecta por **Shared Memory**, pero el backend necesita **TCP/IP**.
 
@@ -75,6 +80,7 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 
 2. Creá/actualizá el archivo `backend/.env` con estos valores (ajustá usuario/clave):
 	- `USER_REPOSITORY=sqlserver`
+	- `TEAM_REPOSITORY=sqlserver` (para persistir equipos en BD)
 	- `DB_SERVER=localhost`
 	- `DB_PORT=1433`
 	- `DB_DATABASE=F1GarageManager`
@@ -151,6 +157,22 @@ GO
 GRANT EXECUTE ON dbo.User_Create TO f1app;
 GRANT EXECUTE ON dbo.User_GetByEmail TO f1app;
 GRANT EXECUTE ON dbo.User_GetById TO f1app;
+
+-- Teams (requeridos si TEAM_REPOSITORY=sqlserver)
+GRANT EXECUTE ON dbo.Team_Create TO f1app;
+GRANT EXECUTE ON dbo.Team_Delete TO f1app;
+GRANT EXECUTE ON dbo.Team_GetById TO f1app;
+GRANT EXECUTE ON dbo.Team_List TO f1app;
+GRANT EXECUTE ON dbo.Team_Update TO f1app;
+GRANT EXECUTE ON dbo.Team_SetBudget TO f1app;
+GRANT EXECUTE ON dbo.Team_AddSponsor TO f1app;
+GRANT EXECUTE ON dbo.Team_RemoveSponsor TO f1app;
+GRANT EXECUTE ON dbo.Team_AddCar TO f1app;
+GRANT EXECUTE ON dbo.Team_RemoveCar TO f1app;
+GRANT EXECUTE ON dbo.Team_AddDriver TO f1app;
+GRANT EXECUTE ON dbo.Team_RemoveDriver TO f1app;
+GRANT EXECUTE ON dbo.Team_AddInventoryItem TO f1app;
+GRANT EXECUTE ON dbo.Team_RemoveInventoryItem TO f1app;
 GO
 ```
 
@@ -158,6 +180,7 @@ GO
 Cada compañero crea su archivo `backend/.env` (no se comparte) con:
 ```dotenv
 USER_REPOSITORY=sqlserver
+TEAM_REPOSITORY=sqlserver
 DB_SERVER=localhost
 DB_PORT=1433
 DB_DATABASE=F1GarageManager

@@ -9,6 +9,7 @@ import { makeAuthController } from "../controllers/auth.controller.js";
 import { makeAuthRoutes } from "./auth.routes.js";
 
 import { InMemoryTeamRepository } from "../repositories/inmemory.team.repository.js";
+import { SqlServerTeamRepository } from "../repositories/sqlserver.team.repository.js";
 import { TeamService } from "../services/team.service.js";
 import { makeTeamController } from "../controllers/team.controller.js";
 import { makeTeamRoutes } from "./team.routes.js";
@@ -28,7 +29,10 @@ router.use("/auth", makeAuthRoutes(authController));
 const seedTeams = [
   { id: "t1", name: "Red Comet Racing", country: "Costa Rica", createdAt: new Date().toISOString(), budget: 0, sponsors: [], inventory: [], cars: [], drivers: [] }
 ];
-const teamRepo = new InMemoryTeamRepository(seedTeams);
+const teamRepo =
+  String(env.teamRepository).toLowerCase() === "sqlserver"
+    ? new SqlServerTeamRepository()
+    : new InMemoryTeamRepository(seedTeams);
 const teamService = new TeamService(teamRepo);
 const teamController = makeTeamController(teamService);
 router.use("/teams", makeTeamRoutes(teamController));

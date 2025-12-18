@@ -51,23 +51,20 @@ export class TeamService {
 
   // -------- Budget ----------
   async setBudget(id, { total, spent }) {
-    const team = await this.getById(id);
+    await this.getById(id);
 
-    const next = {
-      ...team,
-      budget: {
-        total: total !== undefined ? Number(total) : team.budget.total,
-        spent: spent !== undefined ? Number(spent) : team.budget.spent,
-      },
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = await this.teamRepo.setBudget(id, {
+      total: total !== undefined ? Number(total) : undefined,
+      spent: spent !== undefined ? Number(spent) : undefined,
+    });
 
-    return this.teamRepo.replace(id, next);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
   }
 
   // -------- Sponsors ----------
   async addSponsor(teamId, { name, contribution }) {
-    const team = await this.getById(teamId);
+    await this.getById(teamId);
     if (!name?.trim()) throw this._err(400, "Nombre de patrocinador requerido.");
 
     const sponsor = {
@@ -76,27 +73,21 @@ export class TeamService {
       contribution: Number(contribution || 0),
     };
 
-    const next = {
-      ...team,
-      sponsors: [sponsor, ...team.sponsors],
-      updatedAt: new Date().toISOString(),
-    };
-
-    return this.teamRepo.replace(teamId, next);
+    const updated = await this.teamRepo.addSponsor(teamId, sponsor);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
   }
 
   async removeSponsor(teamId, sponsorId) {
-    const team = await this.getById(teamId);
-    const before = team.sponsors.length;
-    const sponsors = team.sponsors.filter(s => s.id !== sponsorId);
-    if (sponsors.length === before) throw this._err(404, "Patrocinador no encontrado.");
-
-    return this.teamRepo.replace(teamId, { ...team, sponsors, updatedAt: new Date().toISOString() });
+    await this.getById(teamId);
+    const updated = await this.teamRepo.removeSponsor(teamId, sponsorId);
+    if (!updated) throw this._err(404, "Patrocinador no encontrado.");
+    return updated;
   }
 
   // -------- Drivers ----------
   async addDriver(teamId, { name, skill }) {
-    const team = await this.getById(teamId);
+    await this.getById(teamId);
     if (!name?.trim()) throw this._err(400, "Nombre de conductor requerido.");
 
     const driver = {
@@ -105,29 +96,23 @@ export class TeamService {
       skill: Number(skill ?? 50),
     };
 
-    return this.teamRepo.replace(teamId, {
-      ...team,
-      drivers: [driver, ...team.drivers],
-      updatedAt: new Date().toISOString(),
-    });
+    const updated = await this.teamRepo.addDriver(teamId, driver);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
   }
 
   async removeDriver(teamId, driverId) {
-    const team = await this.getById(teamId);
-    const before = team.drivers.length;
-    const drivers = team.drivers.filter(d => d.id !== driverId);
-    if (drivers.length === before) throw this._err(404, "Conductor no encontrado.");
-
-    return this.teamRepo.replace(teamId, { ...team, drivers, updatedAt: new Date().toISOString() });
+    await this.getById(teamId);
+    const updated = await this.teamRepo.removeDriver(teamId, driverId);
+    if (!updated) throw this._err(404, "Conductor no encontrado.");
+    return updated;
   }
 
   // -------- Cars (MAX 2) ----------
   async addCar(teamId, { code, name }) {
     const team = await this.getById(teamId);
 
-    if (team.cars.length >= 2) {
-      throw this._err(400, "Restricción: máximo 2 carros por equipo.");
-    }
+    if (team.cars.length >= 2) throw this._err(400, "Restricción: máximo 2 carros por equipo.");
     if (!code?.trim()) throw this._err(400, "Código del carro requerido.");
 
     const car = {
@@ -136,25 +121,21 @@ export class TeamService {
       name: (name || "").trim(),
     };
 
-    return this.teamRepo.replace(teamId, {
-      ...team,
-      cars: [car, ...team.cars],
-      updatedAt: new Date().toISOString(),
-    });
+    const updated = await this.teamRepo.addCar(teamId, car);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
   }
 
   async removeCar(teamId, carId) {
-    const team = await this.getById(teamId);
-    const before = team.cars.length;
-    const cars = team.cars.filter(c => c.id !== carId);
-    if (cars.length === before) throw this._err(404, "Carro no encontrado.");
-
-    return this.teamRepo.replace(teamId, { ...team, cars, updatedAt: new Date().toISOString() });
+    await this.getById(teamId);
+    const updated = await this.teamRepo.removeCar(teamId, carId);
+    if (!updated) throw this._err(404, "Carro no encontrado.");
+    return updated;
   }
 
   // -------- Inventory ----------
   async addInventoryItem(teamId, { partName, category, qty, unitCost }) {
-    const team = await this.getById(teamId);
+    await this.getById(teamId);
     if (!partName?.trim()) throw this._err(400, "Nombre de parte requerido.");
 
     const item = {
@@ -165,20 +146,16 @@ export class TeamService {
       unitCost: Number(unitCost ?? 0),
     };
 
-    return this.teamRepo.replace(teamId, {
-      ...team,
-      inventory: [item, ...team.inventory],
-      updatedAt: new Date().toISOString(),
-    });
+    const updated = await this.teamRepo.addInventoryItem(teamId, item);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
   }
 
   async removeInventoryItem(teamId, itemId) {
-    const team = await this.getById(teamId);
-    const before = team.inventory.length;
-    const inventory = team.inventory.filter(i => i.id !== itemId);
-    if (inventory.length === before) throw this._err(404, "Ítem de inventario no encontrado.");
-
-    return this.teamRepo.replace(teamId, { ...team, inventory, updatedAt: new Date().toISOString() });
+    await this.getById(teamId);
+    const updated = await this.teamRepo.removeInventoryItem(teamId, itemId);
+    if (!updated) throw this._err(404, "Ítem de inventario no encontrado.");
+    return updated;
   }
 
   _err(status, message) {

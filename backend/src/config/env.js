@@ -10,6 +10,9 @@ export const env = {
   // Which user repository to use: "memory" | "sqlserver"
   userRepository: process.env.USER_REPOSITORY || "memory",
 
+  // Which team repository to use: "memory" | "sqlserver"
+  teamRepository: process.env.TEAM_REPOSITORY || "memory",
+
   // SQL Server connection (only used when USER_REPOSITORY=sqlserver)
   // Supports DB_SERVER as "localhost\\SQLEXPRESS" or separate DB_SERVER + DB_INSTANCE.
   db: (() => {
