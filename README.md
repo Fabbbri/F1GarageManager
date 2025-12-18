@@ -57,9 +57,11 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 	- Ejecutá (F5). Esto crea la tabla `dbo.Users` y stored procedures.
 
 4. Ejecutar el script de equipos (relacional, sin JSON):
-	- Abrí el archivo `database/schema/003_teams_relational.sql` en SSMS.
+	- Abrí el archivo `database/schema/003_teams_relational_nogo.sql` en SSMS.
 	- Seleccioná la BD `F1GarageManager`.
 	- Ejecutá (F5). Esto crea/ajusta tablas `dbo.Teams` + tablas hijas y stored procedures `dbo.Team_*`.
+
+> Nota: usamos la versión **nogo** porque evita `GO` y `THROW`, que en algunos entornos/ejecutores causan errores de sintaxis.
 
 ### 2) Habilitar conexión TCP (para que Node conecte)
 > SSMS a veces conecta por **Shared Memory**, pero el backend necesita **TCP/IP**.
@@ -126,9 +128,10 @@ IF DB_ID(N'F1GarageManager') IS NULL
   CREATE DATABASE F1GarageManager;
 GO
 ```
-3. Ejecutar el script:
+3. Ejecutar los scripts:
 	- Abrir `database/schema/001_users.sql`
 	- Ejecutar (F5) apuntando a la BD `F1GarageManager`
+	- Si van a persistir equipos: abrir `database/schema/003_teams_relational_nogo.sql` y ejecutar (F5)
 
 ### B) Habilitar TCP/IP (para Node)
 1. SQL Server Configuration Manager → **Protocols for SQLEXPRESS** → Enable **TCP/IP**.

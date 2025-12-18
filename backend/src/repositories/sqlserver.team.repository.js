@@ -1,6 +1,11 @@
 import { TeamRepository } from "./team.repository.js";
 import { getSqlPool, sql } from "../db/sqlserver.js";
 
+function hasMessage(err, needle) {
+  const msg = String(err?.message || "");
+  return msg.toLowerCase().includes(String(needle).toLowerCase());
+}
+
 function iso(d) {
   if (!d) return null;
   return d instanceof Date ? d.toISOString() : String(d);
@@ -102,7 +107,8 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51003) {
+      // Duplicate keys or SP-level message
+      if (e?.number === 2627 || e?.number === 2601 || hasMessage(e, "ya existe un equipo")) {
         const err = new Error("Ya existe un equipo con ese ID.");
         err.status = 409;
         throw err;
@@ -123,7 +129,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -140,7 +146,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -158,7 +164,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -174,8 +180,8 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51008) return null;
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "patrocinador no encontrado")) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -193,7 +199,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -209,8 +215,8 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51011) return null;
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -228,7 +234,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -244,8 +250,8 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51014) return null;
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "conductor no encontrado")) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -265,7 +271,7 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }
@@ -281,8 +287,8 @@ export class SqlServerTeamRepository extends TeamRepository {
 
       return mapTeamFromRecordsets(result.recordsets);
     } catch (e) {
-      if (e?.number === 51017) return null;
-      if (e?.number === 51004) return null;
+      if (hasMessage(e, "ítem de inventario no encontrado") || hasMessage(e, "item de inventario no encontrado")) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
       throw e;
     }
   }

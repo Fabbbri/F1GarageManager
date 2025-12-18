@@ -1,19 +1,14 @@
 /*
-  F1 Garage Manager - Teams schema (SQL Server) - Relational (NO JSON)
-  Ejecutar en SSMS sobre la base de datos destino.
+  F1 Garage Manager - Teams schema (SQL Server) - Relational (NO JSON) - NO GO / NO THROW
 
-  - Mantiene dbo.Teams como tabla principal (Id, Name, Country, CreatedAt, UpdatedAt)
-  - Normaliza el detalle en tablas hijas:
-      dbo.TeamBudgets (1:1)
-      dbo.TeamSponsors (1:N)
-      dbo.TeamCars (1:N, max 2)
-      dbo.TeamDrivers (1:N)
-      dbo.TeamInventoryItems (1:N)
-  - Provee stored procedures para operaciones de negocio.
+  Este script evita:
+  - GO (batch separator), por si tu herramienta lo envía al servidor.
+  - THROW (por compatibilidad). Usa RAISERROR.
+
+  Ejecutar sobre la base de datos destino (ej: F1GarageManager).
 */
 
 SET NOCOUNT ON;
-GO
 
 -- Ensure Teams table exists
 IF OBJECT_ID('dbo.Teams', 'U') IS NULL
@@ -29,7 +24,6 @@ BEGIN
   CREATE INDEX IX_Teams_UpdatedAt ON dbo.Teams(UpdatedAt DESC);
   CREATE INDEX IX_Teams_Name ON dbo.Teams(Name);
 END
-GO
 
 -- If an older JSON-based column exists, remove it (keeps rows)
 IF COL_LENGTH('dbo.Teams', 'Data') IS NOT NULL
@@ -39,7 +33,6 @@ BEGIN
 
   ALTER TABLE dbo.Teams DROP COLUMN Data;
 END
-GO
 
 -- 1:1 Budget
 IF OBJECT_ID('dbo.TeamBudgets', 'U') IS NULL
@@ -55,7 +48,6 @@ BEGIN
 
   CREATE INDEX IX_TeamBudgets_UpdatedAt ON dbo.TeamBudgets(UpdatedAt DESC);
 END
-GO
 
 -- Sponsors
 IF OBJECT_ID('dbo.TeamSponsors', 'U') IS NULL
@@ -72,7 +64,6 @@ BEGIN
 
   CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TeamSponsors(TeamId);
 END
-GO
 
 -- Cars (max 2 per team enforced in SP)
 IF OBJECT_ID('dbo.TeamCars', 'U') IS NULL
@@ -89,7 +80,6 @@ BEGIN
   CREATE UNIQUE INDEX UX_TeamCars_TeamId_Code ON dbo.TeamCars(TeamId, Code);
   CREATE INDEX IX_TeamCars_TeamId ON dbo.TeamCars(TeamId);
 END
-GO
 
 -- Drivers
 IF OBJECT_ID('dbo.TeamDrivers', 'U') IS NULL
@@ -106,7 +96,6 @@ BEGIN
 
   CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TeamDrivers(TeamId);
 END
-GO
 
 -- Inventory
 IF OBJECT_ID('dbo.TeamInventoryItems', 'U') IS NULL
@@ -125,7 +114,6 @@ BEGIN
 
   CREATE INDEX IX_TeamInventoryItems_TeamId ON dbo.TeamInventoryItems(TeamId);
 END
-GO
 
 -- Ensure every team has a budget row
 INSERT INTO dbo.TeamBudgets (TeamId)
@@ -133,21 +121,21 @@ SELECT t.Id
 FROM dbo.Teams t
 LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
 WHERE b.TeamId IS NULL;
-GO
 
 --------------------------------------------------------------------------------
--- Stored Procedures
+-- Stored Procedures (created via dynamic SQL)
 --------------------------------------------------------------------------------
 
-IF OBJECT_ID('dbo.Team_GetById', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_GetById;
-GO
-CREATE PROCEDURE dbo.Team_GetById
+DECLARE @sql NVARCHAR(MAX);
+
+-- Team_GetById
+IF OBJECT_ID('dbo.Team_GetById', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_GetById');
+SET @sql = N'CREATE PROCEDURE dbo.Team_GetById
   @Id UNIQUEIDENTIFIER
 AS
 BEGIN
   SET NOCOUNT ON;
 
-  -- 1) Team + budget
   SELECT TOP (1)
     t.Id,
     t.Name,
@@ -160,35 +148,31 @@ BEGIN
   LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
   WHERE t.Id = @Id;
 
-  -- 2) Sponsors
   SELECT Id, TeamId, Name, Contribution
   FROM dbo.TeamSponsors
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
-  -- 3) Inventory
   SELECT Id, TeamId, PartName, Category, Qty, UnitCost
   FROM dbo.TeamInventoryItems
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
-  -- 4) Cars
   SELECT Id, TeamId, Code, Name
   FROM dbo.TeamCars
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
-  -- 5) Drivers
   SELECT Id, TeamId, Name, Skill
   FROM dbo.TeamDrivers
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_List', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_List;
-GO
-CREATE PROCEDURE dbo.Team_List
+-- Team_List
+IF OBJECT_ID('dbo.Team_List', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_List');
+SET @sql = N'CREATE PROCEDURE dbo.Team_List
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -204,52 +188,49 @@ BEGIN
   FROM dbo.Teams t
   LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
   ORDER BY t.UpdatedAt DESC;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_Create', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_Create;
-GO
-CREATE PROCEDURE dbo.Team_Create
+-- Team_Create
+IF OBJECT_ID('dbo.Team_Create', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Create');
+SET @sql = N'CREATE PROCEDURE dbo.Team_Create
   @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
   @Country NVARCHAR(120) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
+  SET XACT_ABORT ON;
 
-  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''
+  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
   BEGIN
-    THROW 51001, 'Nombre requerido.', 1;
+    RAISERROR(''Nombre requerido.'', 16, 1);
+    RETURN;
   END
 
   IF EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @Id)
   BEGIN
-    THROW 51003, 'Ya existe un equipo con ese ID.', 1;
+    RAISERROR(''Ya existe un equipo con ese ID.'', 16, 1);
+    RETURN;
   END
 
-  BEGIN TRY
-    BEGIN TRAN;
+  BEGIN TRAN;
 
-    INSERT INTO dbo.Teams (Id, Name, Country)
-    VALUES (@Id, LTRIM(RTRIM(@Name)), NULLIF(LTRIM(RTRIM(@Country)), ''));
+  INSERT INTO dbo.Teams (Id, Name, Country)
+  VALUES (@Id, LTRIM(RTRIM(@Name)), NULLIF(LTRIM(RTRIM(@Country)), ''''));
 
-    INSERT INTO dbo.TeamBudgets (TeamId, Total, Spent)
-    VALUES (@Id, 0, 0);
+  INSERT INTO dbo.TeamBudgets (TeamId, Total, Spent)
+  VALUES (@Id, 0, 0);
 
-    COMMIT TRAN;
-  END TRY
-  BEGIN CATCH
-    IF @@TRANCOUNT > 0 ROLLBACK TRAN;
-    THROW;
-  END CATCH
+  COMMIT TRAN;
 
   EXEC dbo.Team_GetById @Id = @Id;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_Update', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_Update;
-GO
-CREATE PROCEDURE dbo.Team_Update
+-- Team_Update
+IF OBJECT_ID('dbo.Team_Update', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Update');
+SET @sql = N'CREATE PROCEDURE dbo.Team_Update
   @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(120) = NULL,
   @Country NVARCHAR(120) = NULL
@@ -259,26 +240,27 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @Id)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.Teams
   SET
-    Name = COALESCE(NULLIF(LTRIM(RTRIM(@Name)), ''), Name),
+    Name = COALESCE(NULLIF(LTRIM(RTRIM(@Name)), ''''), Name),
     Country = CASE
       WHEN @Country IS NULL THEN Country
-      ELSE NULLIF(LTRIM(RTRIM(@Country)), '')
+      ELSE NULLIF(LTRIM(RTRIM(@Country)), '''')
     END,
     UpdatedAt = SYSUTCDATETIME()
   WHERE Id = @Id;
 
   EXEC dbo.Team_GetById @Id = @Id;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_SetBudget', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_SetBudget;
-GO
-CREATE PROCEDURE dbo.Team_SetBudget
+-- Team_SetBudget
+IF OBJECT_ID('dbo.Team_SetBudget', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_SetBudget');
+SET @sql = N'CREATE PROCEDURE dbo.Team_SetBudget
   @TeamId UNIQUEIDENTIFIER,
   @Total DECIMAL(18,2) = NULL,
   @Spent DECIMAL(18,2) = NULL
@@ -288,7 +270,8 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
 
   DECLARE @NextTotal DECIMAL(18,2);
@@ -302,7 +285,8 @@ BEGIN
 
   IF @NextTotal < 0 OR @NextSpent < 0 OR @NextSpent > @NextTotal
   BEGIN
-    THROW 51005, 'Presupuesto inválido.', 1;
+    RAISERROR(''Presupuesto inválido.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.TeamBudgets
@@ -317,12 +301,12 @@ BEGIN
   WHERE Id = @TeamId;
 
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_AddSponsor', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_AddSponsor;
-GO
-CREATE PROCEDURE dbo.Team_AddSponsor
+-- Team_AddSponsor
+IF OBJECT_ID('dbo.Team_AddSponsor', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddSponsor');
+SET @sql = N'CREATE PROCEDURE dbo.Team_AddSponsor
   @TeamId UNIQUEIDENTIFIER,
   @SponsorId UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
@@ -333,29 +317,31 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
-  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''
+  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
   BEGIN
-    THROW 51006, 'Nombre de patrocinador requerido.', 1;
+    RAISERROR(''Nombre de patrocinador requerido.'', 16, 1);
+    RETURN;
   END
   IF @Contribution < 0
   BEGIN
-    THROW 51007, 'Contribución inválida.', 1;
+    RAISERROR(''Contribución inválida.'', 16, 1);
+    RETURN;
   END
 
   INSERT INTO dbo.TeamSponsors (Id, TeamId, Name, Contribution)
   VALUES (@SponsorId, @TeamId, LTRIM(RTRIM(@Name)), @Contribution);
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
-
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_RemoveSponsor', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_RemoveSponsor;
-GO
-CREATE PROCEDURE dbo.Team_RemoveSponsor
+-- Team_RemoveSponsor
+IF OBJECT_ID('dbo.Team_RemoveSponsor', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveSponsor');
+SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveSponsor
   @TeamId UNIQUEIDENTIFIER,
   @SponsorId UNIQUEIDENTIFIER
 AS
@@ -365,17 +351,18 @@ BEGIN
   DELETE FROM dbo.TeamSponsors WHERE TeamId = @TeamId AND Id = @SponsorId;
   IF @@ROWCOUNT = 0
   BEGIN
-    THROW 51008, 'Patrocinador no encontrado.', 1;
+    RAISERROR(''Patrocinador no encontrado.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_AddCar', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_AddCar;
-GO
-CREATE PROCEDURE dbo.Team_AddCar
+-- Team_AddCar
+IF OBJECT_ID('dbo.Team_AddCar', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddCar');
+SET @sql = N'CREATE PROCEDURE dbo.Team_AddCar
   @TeamId UNIQUEIDENTIFIER,
   @CarId UNIQUEIDENTIFIER,
   @Code NVARCHAR(40),
@@ -386,29 +373,32 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
-  IF @Code IS NULL OR LTRIM(RTRIM(@Code)) = ''
+  IF @Code IS NULL OR LTRIM(RTRIM(@Code)) = ''''
   BEGIN
-    THROW 51009, 'Código del carro requerido.', 1;
+    RAISERROR(''Código del carro requerido.'', 16, 1);
+    RETURN;
   END
 
   IF (SELECT COUNT(1) FROM dbo.TeamCars WHERE TeamId = @TeamId) >= 2
   BEGIN
-    THROW 51010, 'Restricción: máximo 2 carros por equipo.', 1;
+    RAISERROR(''Restricción: máximo 2 carros por equipo.'', 16, 1);
+    RETURN;
   END
 
   INSERT INTO dbo.TeamCars (Id, TeamId, Code, Name)
-  VALUES (@CarId, @TeamId, LTRIM(RTRIM(@Code)), NULLIF(LTRIM(RTRIM(@Name)), ''));
+  VALUES (@CarId, @TeamId, LTRIM(RTRIM(@Code)), NULLIF(LTRIM(RTRIM(@Name)), ''''));
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_RemoveCar', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_RemoveCar;
-GO
-CREATE PROCEDURE dbo.Team_RemoveCar
+-- Team_RemoveCar
+IF OBJECT_ID('dbo.Team_RemoveCar', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveCar');
+SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveCar
   @TeamId UNIQUEIDENTIFIER,
   @CarId UNIQUEIDENTIFIER
 AS
@@ -418,17 +408,18 @@ BEGIN
   DELETE FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId;
   IF @@ROWCOUNT = 0
   BEGIN
-    THROW 51011, 'Carro no encontrado.', 1;
+    RAISERROR(''Carro no encontrado.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_AddDriver', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_AddDriver;
-GO
-CREATE PROCEDURE dbo.Team_AddDriver
+-- Team_AddDriver
+IF OBJECT_ID('dbo.Team_AddDriver', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddDriver');
+SET @sql = N'CREATE PROCEDURE dbo.Team_AddDriver
   @TeamId UNIQUEIDENTIFIER,
   @DriverId UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
@@ -439,15 +430,18 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
-  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''
+  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
   BEGIN
-    THROW 51012, 'Nombre de conductor requerido.', 1;
+    RAISERROR(''Nombre de conductor requerido.'', 16, 1);
+    RETURN;
   END
   IF @Skill < 0 OR @Skill > 100
   BEGIN
-    THROW 51013, 'Habilidad inválida.', 1;
+    RAISERROR(''Habilidad inválida.'', 16, 1);
+    RETURN;
   END
 
   INSERT INTO dbo.TeamDrivers (Id, TeamId, Name, Skill)
@@ -455,12 +449,12 @@ BEGIN
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_RemoveDriver', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_RemoveDriver;
-GO
-CREATE PROCEDURE dbo.Team_RemoveDriver
+-- Team_RemoveDriver
+IF OBJECT_ID('dbo.Team_RemoveDriver', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveDriver');
+SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveDriver
   @TeamId UNIQUEIDENTIFIER,
   @DriverId UNIQUEIDENTIFIER
 AS
@@ -470,17 +464,18 @@ BEGIN
   DELETE FROM dbo.TeamDrivers WHERE TeamId = @TeamId AND Id = @DriverId;
   IF @@ROWCOUNT = 0
   BEGIN
-    THROW 51014, 'Conductor no encontrado.', 1;
+    RAISERROR(''Conductor no encontrado.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_AddInventoryItem', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_AddInventoryItem;
-GO
-CREATE PROCEDURE dbo.Team_AddInventoryItem
+-- Team_AddInventoryItem
+IF OBJECT_ID('dbo.Team_AddInventoryItem', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddInventoryItem');
+SET @sql = N'CREATE PROCEDURE dbo.Team_AddInventoryItem
   @TeamId UNIQUEIDENTIFIER,
   @ItemId UNIQUEIDENTIFIER,
   @PartName NVARCHAR(160),
@@ -493,15 +488,18 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
   BEGIN
-    THROW 51004, 'Equipo no encontrado.', 1;
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
   END
-  IF @PartName IS NULL OR LTRIM(RTRIM(@PartName)) = ''
+  IF @PartName IS NULL OR LTRIM(RTRIM(@PartName)) = ''''
   BEGIN
-    THROW 51015, 'Nombre de parte requerido.', 1;
+    RAISERROR(''Nombre de parte requerido.'', 16, 1);
+    RETURN;
   END
   IF @Qty < 0 OR @UnitCost < 0
   BEGIN
-    THROW 51016, 'Valores de inventario inválidos.', 1;
+    RAISERROR(''Valores de inventario inválidos.'', 16, 1);
+    RETURN;
   END
 
   INSERT INTO dbo.TeamInventoryItems (Id, TeamId, PartName, Category, Qty, UnitCost)
@@ -509,19 +507,19 @@ BEGIN
     @ItemId,
     @TeamId,
     LTRIM(RTRIM(@PartName)),
-    NULLIF(LTRIM(RTRIM(@Category)), ''),
+    NULLIF(LTRIM(RTRIM(@Category)), ''''),
     @Qty,
     @UnitCost
   );
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_RemoveInventoryItem', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_RemoveInventoryItem;
-GO
-CREATE PROCEDURE dbo.Team_RemoveInventoryItem
+-- Team_RemoveInventoryItem
+IF OBJECT_ID('dbo.Team_RemoveInventoryItem', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveInventoryItem');
+SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveInventoryItem
   @TeamId UNIQUEIDENTIFIER,
   @ItemId UNIQUEIDENTIFIER
 AS
@@ -531,17 +529,18 @@ BEGIN
   DELETE FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND Id = @ItemId;
   IF @@ROWCOUNT = 0
   BEGIN
-    THROW 51017, 'Ítem de inventario no encontrado.', 1;
+    RAISERROR(''Ítem de inventario no encontrado.'', 16, 1);
+    RETURN;
   END
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
 
-IF OBJECT_ID('dbo.Team_Delete', 'P') IS NOT NULL DROP PROCEDURE dbo.Team_Delete;
-GO
-CREATE PROCEDURE dbo.Team_Delete
+-- Team_Delete
+IF OBJECT_ID('dbo.Team_Delete', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Delete');
+SET @sql = N'CREATE PROCEDURE dbo.Team_Delete
   @TeamId UNIQUEIDENTIFIER
 AS
 BEGIN
@@ -549,5 +548,5 @@ BEGIN
 
   DELETE FROM dbo.Teams WHERE Id = @TeamId;
   SELECT @@ROWCOUNT AS affected;
-END
-GO
+END';
+EXEC sys.sp_executesql @sql;
