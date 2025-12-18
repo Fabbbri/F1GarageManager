@@ -25,16 +25,16 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 ## 📚 Dependencias
 
 1. En carpeta backend
-npm init -y
-npm i express cors dotenv jsonwebtoken bcryptjs
-npm i -D nodemon
+- npm init -y
+- npm i express cors dotenv jsonwebtoken bcryptjs
+- npm i -D nodemon
 
 ---
 
 2. En carpeta frontend
-npm install
-npm i @mui/material @emotion/react @emotion/styled
-npm i @mui/icons-material
+- npm install
+- npm i @mui/material @emotion/react @emotion/styled
+- npm i @mui/icons-material
 
 ## ▶️ Correrlo
 1. En carpeta backend: npm run dev
