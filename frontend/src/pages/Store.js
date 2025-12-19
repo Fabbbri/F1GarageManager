@@ -18,7 +18,7 @@ import {
 
 import { getSession } from "../services/auth";
 import { listTeams } from "../services/teams";
-import { listParts, createPart } from "../services/parts";
+import { listParts, createPart, restockPart } from "../services/parts";
 import { purchasePart } from "../services/teams";
 
 const REQUIRED_CATEGORIES = [
@@ -32,6 +32,7 @@ const REQUIRED_CATEGORIES = [
 export default function Store() {
   const session = getSession();
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
+  const canRestock = useMemo(() => session?.role === "ADMIN", [session]);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -54,6 +55,10 @@ export default function Store() {
   // purchase
   const [buyPartId, setBuyPartId] = useState("");
   const [buyQty, setBuyQty] = useState("");
+
+  // restock
+  const [restockPartId, setRestockPartId] = useState("");
+  const [restockQty, setRestockQty] = useState("");
 
   const selectedTeam = useMemo(() => teams.find((t) => t.id === selectedTeamId) || null, [teams, selectedTeamId]);
   const selectedPart = useMemo(() => parts.find((p) => p.id === buyPartId) || null, [parts, buyPartId]);
@@ -154,6 +159,30 @@ export default function Store() {
     }
   };
 
+  const restockQtyNum = Number(restockQty);
+  const restockQtyValid = Number.isInteger(restockQtyNum) && restockQtyNum > 0;
+  const restockSelectedPart = useMemo(
+    () => parts.find((p) => p.id === restockPartId) || null,
+    [parts, restockPartId]
+  );
+
+  const onRestock = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    try {
+      if (!restockPartId) throw new Error("Selecciona una parte.");
+      if (!restockQtyValid) throw new Error("Cantidad inválida.");
+
+      const updated = await restockPart(restockPartId, { qty: restockQtyNum });
+      setRestockQty("");
+      setSuccess(`Re-stock exitoso: ${updated?.name || restockSelectedPart?.name || "Parte"} +${restockQtyNum} (stock: ${updated?.stock ?? "?"}).`);
+      await reloadPartsOnly();
+    } catch (e2) {
+      setError(e2.message || "Error re-stockeando");
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
       <Stack spacing={2}>
@@ -210,6 +239,44 @@ export default function Store() {
                       <TextField label="Rendimiento: p" value={perfP} onChange={(e) => setPerfP(e.target.value)} fullWidth />
                       <TextField label="Rendimiento: a" value={perfA} onChange={(e) => setPerfA(e.target.value)} fullWidth />
                       <TextField label="Rendimiento: m" value={perfM} onChange={(e) => setPerfM(e.target.value)} fullWidth />
+                    </Stack>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {canRestock && (
+              <Card>
+                <CardContent>
+                  <Typography fontWeight={800} sx={{ mb: 1 }}>Re-stock (reabastecer stock)</Typography>
+                  <Box component="form" onSubmit={onRestock}>
+                    <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
+                      <FormControl fullWidth>
+                        <InputLabel id="restock-part-select-label">Parte</InputLabel>
+                        <Select
+                          labelId="restock-part-select-label"
+                          label="Parte"
+                          value={restockPartId}
+                          onChange={(e) => setRestockPartId(e.target.value)}
+                        >
+                          {parts.map((p) => (
+                            <MenuItem key={p.id} value={p.id}>
+                              {p.name} (stock: {p.stock})
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <TextField
+                        label="Cantidad a agregar"
+                        value={restockQty}
+                        onChange={(e) => setRestockQty(e.target.value)}
+                        fullWidth
+                      />
+
+                      <Button type="submit" variant="contained" disabled={!restockPartId || !restockQtyValid}>
+                        Re-stock
+                      </Button>
                     </Stack>
                   </Box>
                 </CardContent>

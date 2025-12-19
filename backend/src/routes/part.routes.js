@@ -6,6 +6,7 @@ export function makePartRoutes(partController) {
 
   r.get("/", requireAuth, requireRole("ADMIN", "ENGINEER"), partController.list);
   r.post("/", requireAuth, requireRole("ADMIN", "ENGINEER"), partController.create);
+  r.post("/:id/restock", requireAuth, requireRole("ADMIN"), partController.restock);
 
   return r;
 }

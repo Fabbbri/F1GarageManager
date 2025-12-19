@@ -58,6 +58,18 @@ export class PartService {
     return this.partRepo.create(part);
   }
 
+  async restock(partId, { qty }) {
+    const id = String(partId || "").trim();
+    if (!id) throw this._err(400, "partId requerido.");
+
+    const nQty = Number(qty);
+    if (!Number.isInteger(nQty) || nQty <= 0) throw this._err(400, "Cantidad inválida.");
+
+    const updated = await this.partRepo.incrementStock(id, nQty);
+    if (!updated) throw this._err(404, "Parte no encontrada.");
+    return updated;
+  }
+
   _err(status, message) {
     const e = new Error(message);
     e.status = status;

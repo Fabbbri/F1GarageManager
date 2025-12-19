@@ -19,3 +19,15 @@ export async function listParts() {
 export async function createPart(payload) {
   return (await handle(await fetch(`${API_URL}/parts`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).part;
 }
+
+export async function restockPart(partId, payload) {
+  return (
+    await handle(
+      await fetch(`${API_URL}/parts/${partId}/restock`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload),
+      })
+    )
+  ).part;
+}
