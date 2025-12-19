@@ -28,5 +28,12 @@ export function makeTeamController(teamService) {
 
     addInventoryItem: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addInventoryItem(req.params.id, req.body) })),
     removeInventoryItem: asyncHandler(async (req, res) => res.json({ team: await teamService.removeInventoryItem(req.params.id, req.params.itemId) })),
+
+    installPart: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.installPart(req.params.id, { carId: req.params.carId, ...req.body }) })),
+    uninstallPart: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.uninstallPart(req.params.id, { carId: req.params.carId, ...req.body }) })),
+
+    assignCarDriver: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.assignCarDriver(req.params.id, { carId: req.params.carId, ...req.body }) })),
+    finalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.finalizeCar(req.params.id, { carId: req.params.carId }) })),
+    unfinalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.unfinalizeCar(req.params.id, { carId: req.params.carId }) })),
   };
 }

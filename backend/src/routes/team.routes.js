@@ -32,6 +32,14 @@ export function makeTeamRoutes(teamController) {
   r.post("/:id/cars", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addCar);
   r.delete("/:id/cars/:carId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeCar);
 
+  // armado / instalación de partes
+  r.post("/:id/cars/:carId/install", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.installPart);
+  r.post("/:id/cars/:carId/uninstall", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.uninstallPart);
+
+  r.post("/:id/cars/:carId/assign-driver", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.assignCarDriver);
+  r.post("/:id/cars/:carId/finalize", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.finalizeCar);
+  r.post("/:id/cars/:carId/unfinalize", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.unfinalizeCar);
+
   r.post("/:id/inventory", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addInventoryItem);
   r.delete("/:id/inventory/:itemId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeInventoryItem);
 

@@ -11,4 +11,5 @@ export class PartRepository {
   async decrementStock(id, qty) {
     throw new Error("Not implemented");
   }
+  async incrementStock(id, qty) { throw new Error("Not implemented"); }
 }

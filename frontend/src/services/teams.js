@@ -76,6 +76,26 @@ export async function purchasePart(teamId, payload) {
   return (await handle(await fetch(`${API_URL}/teams/${teamId}/store/purchase`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
 }
 
+export async function installPart(teamId, carId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/cars/${carId}/install`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
+export async function uninstallPart(teamId, carId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/cars/${carId}/uninstall`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
+export async function assignCarDriver(teamId, carId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/cars/${carId}/assign-driver`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
+export async function finalizeCar(teamId, carId) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/cars/${carId}/finalize`, { method: "POST", headers: headers() }))).team;
+}
+
+export async function unfinalizeCar(teamId, carId) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/cars/${carId}/unfinalize`, { method: "POST", headers: headers() }))).team;
+}
+
 
 export async function deleteTeam(id) {
   const res = await fetch(`${API_URL}/teams/${id}`, {

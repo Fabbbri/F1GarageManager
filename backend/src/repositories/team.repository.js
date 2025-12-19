@@ -15,8 +15,17 @@ export class TeamRepository {
   async removeCar(teamId, carId) { throw new Error("Not implemented"); }
   async addInventoryItem(teamId, item) { throw new Error("Not implemented"); }
   async removeInventoryItem(teamId, itemId) { throw new Error("Not implemented"); }
-  async upsertInventoryFromPurchase(teamId, { partId, partName, category, qty, unitCost, performance }) {
+  async upsertInventoryFromPurchase(teamId, { partId, partName, category, qty, unitCost, performance, acquiredAt }) {
     throw new Error("Not implemented");
   }
+
+  async purchasePartTx(teamId, { partId, qty }) {
+    throw new Error("Not implemented");
+  }
+  async installPart(teamId, { carId, inventoryItemId }) { throw new Error("Not implemented"); }
+  async uninstallPart(teamId, { carId, installedPartId }) { throw new Error("Not implemented"); }
+  async assignCarDriver(teamId, { carId, driverId }) { throw new Error("Not implemented"); }
+  async finalizeCar(teamId, { carId }) { throw new Error("Not implemented"); }
+  async unfinalizeCar(teamId, { carId }) { throw new Error("Not implemented"); }
   async remove(id) { throw new Error("Not implemented"); }
 }

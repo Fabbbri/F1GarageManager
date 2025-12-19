@@ -4,6 +4,16 @@ export class TeamService {
     this.partRepo = partRepo;
   }
 
+  static allowedPartCategories() {
+    return [
+      "Power Unit",
+      "Paquete aerodinámico",
+      "Neumáticos",
+      "Suspensión",
+      "Caja de cambios",
+    ];
+  }
+
   async list() {
     return this.teamRepo.list();
   }
@@ -195,27 +205,65 @@ export class TeamService {
 
   // -------- Store purchase ----------
   async purchasePart(teamId, { partId, qty }) {
-    if (!this.partRepo) throw this._err(500, "Catálogo de partes no configurado.");
-    await this.getById(teamId);
-
     if (!partId) throw this._err(400, "partId requerido.");
     const nQty = Number(qty);
     if (!Number.isInteger(nQty) || nQty <= 0) throw this._err(400, "Cantidad inválida.");
 
+    // Prefer atomic SQL transaction when available
+    if (typeof this.teamRepo.purchasePartTx === "function") {
+      try {
+        const updated = await this.teamRepo.purchasePartTx(teamId, { partId: String(partId), qty: nQty });
+        if (!updated) throw this._err(404, "Equipo no encontrado.");
+        return updated;
+      } catch (e) {
+        const msg = String(e?.message || "").toLowerCase();
+        if (msg.includes("stock insuficiente")) throw this._err(400, "Stock insuficiente.");
+        if (msg.includes("presupuesto insuficiente")) throw this._err(400, "Presupuesto insuficiente.");
+        if (msg.includes("parte no encontrada")) throw this._err(404, "Parte no encontrada.");
+        if (msg.includes("cantidad inválida") || msg.includes("cantidad invalida")) throw this._err(400, "Cantidad inválida.");
+        throw e;
+      }
+    }
+
+    // Fallback (memory mode)
+    if (!this.partRepo) throw this._err(500, "Catálogo de partes no configurado.");
+    const team = await this.getById(teamId);
+
     const part = await this.partRepo.findById(String(partId));
     if (!part) throw this._err(404, "Parte no encontrada.");
+    if (!TeamService.allowedPartCategories().includes(String(part.category || "").trim())) {
+      throw this._err(400, "La parte tiene una categoría inválida (debe ser una de las 5 categorías obligatorias).");
+    }
     if (Number(part.stock || 0) < nQty) throw this._err(400, "Stock insuficiente.");
 
-    await this.partRepo.decrementStock(String(partId), nQty);
+    const unitCost = Number(part.price || 0);
+    const totalCost = unitCost * nQty;
+    const budgetTotal = Number(team.budget?.total ?? 0);
+    const budgetSpent = Number(team.budget?.spent ?? 0);
+    const remaining = budgetTotal - budgetSpent;
+    if (!Number.isFinite(totalCost) || totalCost < 0) throw this._err(400, "Costo total inválido.");
+    if (remaining < totalCost) throw this._err(400, `Presupuesto insuficiente. Disponible: ${remaining}. Costo: ${totalCost}.`);
 
-    const updated = await this.teamRepo.upsertInventoryFromPurchase(teamId, {
-      partId: part.id,
-      partName: part.name,
-      category: part.category,
-      qty: nQty,
-      unitCost: part.price,
-      performance: part.performance,
-    });
+    const dec = await this.partRepo.decrementStock(String(partId), nQty);
+    if (!dec) throw this._err(400, "Stock insuficiente.");
+
+    let updated;
+    try {
+      updated = await this.teamRepo.upsertInventoryFromPurchase(teamId, {
+        partId: part.id,
+        partName: part.name,
+        category: part.category,
+        qty: nQty,
+        unitCost,
+        performance: part.performance,
+        acquiredAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      await this.partRepo.incrementStock?.(String(partId), nQty).catch(() => {});
+      const msg = String(e?.message || "");
+      if (msg.toLowerCase().includes("presupuesto")) throw this._err(400, msg);
+      throw e;
+    }
     if (!updated) throw this._err(404, "Equipo no encontrado.");
     return updated;
   }
@@ -256,6 +304,7 @@ export class TeamService {
       category: (category || "").trim(),
       qty: Number(qty ?? 0),
       unitCost: Number(unitCost ?? 0),
+      acquiredAt: new Date().toISOString(),
     };
 
     const updated = await this.teamRepo.addInventoryItem(teamId, item);
@@ -264,9 +313,110 @@ export class TeamService {
   }
 
   async removeInventoryItem(teamId, itemId) {
-    await this.getById(teamId);
+    const team = await this.getById(teamId);
+
+    const installedSomewhere = (team.cars || []).some((c) =>
+      (c.installedParts || []).some((p) => String(p.inventoryItemId) === String(itemId))
+    );
+    if (installedSomewhere) throw this._err(400, "No podés eliminar una parte que está instalada en un carro.");
+
     const updated = await this.teamRepo.removeInventoryItem(teamId, itemId);
     if (!updated) throw this._err(404, "Ítem de inventario no encontrado.");
+    return updated;
+  }
+
+  // -------- Assembly / Install rules (6.6) ----------
+  async installPart(teamId, { carId, inventoryItemId }) {
+    const team = await this.getById(teamId);
+    if (!carId) throw this._err(400, "carId requerido.");
+    if (!inventoryItemId) throw this._err(400, "inventoryItemId requerido.");
+
+    const car = (team.cars || []).find((c) => c.id === String(carId));
+    if (!car) throw this._err(404, "Carro no encontrado.");
+    if (car.isFinalized) throw this._err(400, "El carro está finalizado. Usá 'Editar carro' para modificarlo.");
+
+    const inv = (team.inventory || []).find((i) => i.id === String(inventoryItemId));
+    if (!inv) throw this._err(404, "Ítem de inventario no encontrado.");
+    if (!Number.isInteger(Number(inv.qty)) || Number(inv.qty) <= 0) throw this._err(400, "No hay stock en inventario para instalar.");
+
+    const cat = String(inv.category || "").trim();
+    if (!TeamService.allowedPartCategories().includes(cat)) {
+      throw this._err(400, "Categoría inválida en inventario. Debe ser una de las 5 categorías obligatorias.");
+    }
+
+    // Regla de armado simple: 1 parte por categoría por carro.
+    // Si ya existe una instalada en esa categoría, se reemplaza (desinstala + se devuelve al inventario).
+    const updated = await this.teamRepo.installPart(teamId, {
+      carId: String(carId),
+      inventoryItemId: String(inventoryItemId),
+    });
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
+  }
+
+  async uninstallPart(teamId, { carId, installedPartId }) {
+    const team = await this.getById(teamId);
+    if (!carId) throw this._err(400, "carId requerido.");
+    if (!installedPartId) throw this._err(400, "installedPartId requerido.");
+
+    const car = (team.cars || []).find((c) => c.id === String(carId));
+    if (!car) throw this._err(404, "Carro no encontrado.");
+    if (car.isFinalized) throw this._err(400, "El carro está finalizado. Usá 'Editar carro' para modificarlo.");
+
+    const updated = await this.teamRepo.uninstallPart(teamId, {
+      carId: String(carId),
+      installedPartId: String(installedPartId),
+    });
+    if (!updated) throw this._err(404, "Parte instalada no encontrada.");
+    return updated;
+  }
+
+  async assignCarDriver(teamId, { carId, driverId }) {
+    const team = await this.getById(teamId);
+    if (!carId) throw this._err(400, "carId requerido.");
+
+    const car = (team.cars || []).find((c) => c.id === String(carId));
+    if (!car) throw this._err(404, "Carro no encontrado.");
+    if (car.isFinalized) throw this._err(400, "El carro está finalizado. Usá 'Editar carro' para modificarlo.");
+
+    if (driverId !== null && driverId !== undefined && String(driverId) !== "") {
+      const exists = (team.drivers || []).some((d) => d.id === String(driverId));
+      if (!exists) throw this._err(404, "Conductor no encontrado.");
+    }
+
+    const updated = await this.teamRepo.assignCarDriver(teamId, {
+      carId: String(carId),
+      driverId: driverId ? String(driverId) : null,
+    });
+    if (!updated) throw this._err(404, "Equipo o carro no encontrado.");
+    return updated;
+  }
+
+  async finalizeCar(teamId, { carId }) {
+    const team = await this.getById(teamId);
+    if (!carId) throw this._err(400, "carId requerido.");
+
+    const car = (team.cars || []).find((c) => c.id === String(carId));
+    if (!car) throw this._err(404, "Carro no encontrado.");
+
+    if (!car.driverId) throw this._err(400, "Debe asignar un conductor antes de finalizar el carro.");
+
+    const required = TeamService.allowedPartCategories();
+    const installed = car.installedParts || [];
+    const hasAll = required.every((cat) => installed.some((p) => String(p.categoryKey) === cat));
+    if (!hasAll) throw this._err(400, "No se puede finalizar: el carro debe tener las 5 categorías obligatorias instaladas.");
+
+    const updated = await this.teamRepo.finalizeCar(teamId, { carId: String(carId) });
+    if (!updated) throw this._err(404, "Equipo o carro no encontrado.");
+    return updated;
+  }
+
+  async unfinalizeCar(teamId, { carId }) {
+    await this.getById(teamId);
+    if (!carId) throw this._err(400, "carId requerido.");
+
+    const updated = await this.teamRepo.unfinalizeCar(teamId, { carId: String(carId) });
+    if (!updated) throw this._err(404, "Equipo o carro no encontrado.");
     return updated;
   }
 

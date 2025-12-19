@@ -25,23 +25,65 @@ function mapTeamFromRecordsets(recordsets) {
 
   const inventory = (recordsets?.[2] || []).map((r) => ({
     id: String(r.Id),
+    partId: r.PartId ? String(r.PartId) : null,
     partName: r.PartName,
     category: r.Category ?? "",
+    performance: {
+      p: Number(r.P ?? 0),
+      a: Number(r.A ?? 0),
+      m: Number(r.M ?? 0),
+    },
     qty: Number(r.Qty ?? 0),
     unitCost: Number(r.UnitCost ?? 0),
+    acquiredAt: iso(r.AcquiredAt ?? r.CreatedAt),
   }));
 
   const cars = (recordsets?.[3] || []).map((r) => ({
     id: String(r.Id),
     code: r.Code,
     name: r.Name ?? "",
+    driverId: r.DriverId ? String(r.DriverId) : null,
+    isFinalized: Boolean(r.IsFinalized),
+    installedParts: [],
   }));
 
-  const drivers = (recordsets?.[4] || []).map((r) => ({
+  const rs4 = recordsets?.[4] || [];
+  const rs5 = recordsets?.[5] || [];
+
+  const rs4LooksLikeDrivers = rs4.length > 0 && Object.prototype.hasOwnProperty.call(rs4[0], "Skill");
+  const installedRows = rs4LooksLikeDrivers ? [] : rs4;
+  const driverRows = rs4LooksLikeDrivers ? rs4 : rs5;
+
+  const drivers = (driverRows || []).map((r) => ({
     id: String(r.Id),
     name: r.Name,
     skill: Number(r.Skill ?? 50),
   }));
+
+  if (installedRows.length) {
+    const byCarId = new Map();
+    for (const row of installedRows) {
+      const carId = String(row.CarId);
+      if (!byCarId.has(carId)) byCarId.set(carId, []);
+      byCarId.get(carId).push({
+        id: String(row.Id),
+        inventoryItemId: String(row.InventoryItemId),
+        partName: row.PartName,
+        category: row.Category ?? "",
+        categoryKey: row.CategoryKey ?? (String(row.Category || "").trim() || String(row.PartName)),
+        performance: {
+          p: Number(row.P ?? 0),
+          a: Number(row.A ?? 0),
+          m: Number(row.M ?? 0),
+        },
+        installedAt: iso(row.InstalledAt),
+      });
+    }
+
+    for (const c of cars) {
+      c.installedParts = byCarId.get(String(c.id)) || [];
+    }
+  }
 
   return {
     id: String(teamRow.Id),
@@ -301,6 +343,140 @@ export class SqlServerTeamRepository extends TeamRepository {
     } catch (e) {
       if (hasMessage(e, "ítem de inventario no encontrado") || hasMessage(e, "item de inventario no encontrado")) return null;
       if (hasMessage(e, "equipo no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async upsertInventoryFromPurchase(teamId, { partId, partName, category, qty, unitCost, performance }) {
+    const pool = await getSqlPool();
+    try {
+      const p = Number(performance?.p ?? 0);
+      const a = Number(performance?.a ?? 0);
+      const m = Number(performance?.m ?? 0);
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("PartId", sql.UniqueIdentifier, partId)
+        .input("PartName", sql.NVarChar(160), partName)
+        .input("Category", sql.NVarChar(120), category || null)
+        .input("P", sql.Int, p)
+        .input("A", sql.Int, a)
+        .input("M", sql.Int, m)
+        .input("Qty", sql.Int, Number(qty ?? 0))
+        .input("UnitCost", sql.Decimal(18, 2), Number(unitCost ?? 0))
+        .execute("dbo.Team_UpsertInventoryFromPurchase");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async purchasePartTx(teamId, { partId, qty }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("PartId", sql.UniqueIdentifier, partId)
+        .input("Qty", sql.Int, qty)
+        .execute("dbo.Store_PurchasePart");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async installPart(teamId, { carId, inventoryItemId }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("CarId", sql.UniqueIdentifier, carId)
+        .input("InventoryItemId", sql.UniqueIdentifier, inventoryItemId)
+        .execute("dbo.Team_InstallPart");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
+      if (hasMessage(e, "ítem de inventario no encontrado") || hasMessage(e, "item de inventario no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async uninstallPart(teamId, { carId, installedPartId }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("CarId", sql.UniqueIdentifier, carId)
+        .input("InstalledPartId", sql.UniqueIdentifier, installedPartId)
+        .execute("dbo.Team_UninstallPart");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "parte instalada no encontrada")) return null;
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async assignCarDriver(teamId, { carId, driverId }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("CarId", sql.UniqueIdentifier, carId)
+        .input("DriverId", sql.UniqueIdentifier, driverId || null)
+        .execute("dbo.Team_AssignCarDriver");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
+      if (hasMessage(e, "conductor no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async finalizeCar(teamId, { carId }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("CarId", sql.UniqueIdentifier, carId)
+        .execute("dbo.Team_FinalizeCar");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
+      throw e;
+    }
+  }
+
+  async unfinalizeCar(teamId, { carId }) {
+    const pool = await getSqlPool();
+    try {
+      const result = await pool
+        .request()
+        .input("TeamId", sql.UniqueIdentifier, teamId)
+        .input("CarId", sql.UniqueIdentifier, carId)
+        .execute("dbo.Team_UnfinalizeCar");
+
+      return mapTeamFromRecordsets(result.recordsets);
+    } catch (e) {
+      if (hasMessage(e, "equipo no encontrado")) return null;
+      if (hasMessage(e, "carro no encontrado")) return null;
       throw e;
     }
   }

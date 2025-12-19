@@ -148,9 +148,16 @@ export class InMemoryTeamRepository extends TeamRepository {
     const existing = await this.findById(teamId);
     if (!existing) return null;
 
+    const nextCar = {
+      ...car,
+      driverId: car.driverId ?? null,
+      isFinalized: Boolean(car.isFinalized ?? false),
+      installedParts: car.installedParts || [],
+    };
+
     const next = {
       ...existing,
-      cars: [car, ...(existing.cars || [])],
+      cars: [nextCar, ...(existing.cars || [])],
       updatedAt: new Date().toISOString(),
     };
 
@@ -162,10 +169,30 @@ export class InMemoryTeamRepository extends TeamRepository {
     const existing = await this.findById(teamId);
     if (!existing) return null;
 
-    const nextCars = (existing.cars || []).filter(c => c.id !== carId);
-    if (nextCars.length === (existing.cars || []).length) return null;
+    const cars = existing.cars || [];
+    const car = cars.find(c => c.id === carId);
+    if (!car) return null;
+
+    // Si el carro tiene partes instaladas, se devuelven al inventario.
+    const installed = car.installedParts || [];
+    let nextInventory = existing.inventory || [];
+    if (installed.length) {
+      nextInventory = [...nextInventory];
+      for (const p of installed) {
+        const idx = nextInventory.findIndex(i => i.id === String(p.inventoryItemId));
+        if (idx >= 0) {
+          nextInventory[idx] = {
+            ...nextInventory[idx],
+            qty: Number(nextInventory[idx].qty || 0) + 1,
+          };
+        }
+      }
+    }
+
+    const nextCars = cars.filter(c => c.id !== carId);
 
     const next = { ...existing, cars: nextCars, updatedAt: new Date().toISOString() };
+    if (installed.length) next.inventory = nextInventory;
     this.byId.set(teamId, next);
     return next;
   }
@@ -188,6 +215,13 @@ export class InMemoryTeamRepository extends TeamRepository {
     const existing = await this.findById(teamId);
     if (!existing) return null;
 
+    const totalCost = Number(unitCost || 0) * Number(qty || 0);
+    const budget = existing.budget || { total: 0, spent: 0 };
+    const nextBudget = {
+      total: Number(budget.total || 0),
+      spent: Number(budget.spent || 0) + (Number.isFinite(totalCost) ? totalCost : 0),
+    };
+
     const inventory = existing.inventory || [];
     const idx = inventory.findIndex(i => i.partId && partId && i.partId === partId);
 
@@ -199,6 +233,7 @@ export class InMemoryTeamRepository extends TeamRepository {
         qty: Number(current.qty || 0) + Number(qty || 0),
         unitCost: unitCost !== undefined ? Number(unitCost) : Number(current.unitCost || 0),
         performance: performance !== undefined ? performance : current.performance,
+        acquiredAt: new Date().toISOString(),
       };
       nextInventory = [...inventory];
       nextInventory[idx] = updatedItem;
@@ -211,16 +246,195 @@ export class InMemoryTeamRepository extends TeamRepository {
         qty: Number(qty || 0),
         unitCost: Number(unitCost || 0),
         performance,
+        acquiredAt: new Date().toISOString(),
       };
       nextInventory = [item, ...inventory];
     }
 
     const next = {
       ...existing,
+      budget: nextBudget,
       inventory: nextInventory,
       updatedAt: new Date().toISOString(),
     };
 
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async installPart(teamId, { carId, inventoryItemId }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const cars = existing.cars || [];
+    const carIdx = cars.findIndex(c => c.id === String(carId));
+    if (carIdx < 0) return null;
+    const car = cars[carIdx];
+
+    const inventory = existing.inventory || [];
+    const invIdx = inventory.findIndex(i => i.id === String(inventoryItemId));
+    if (invIdx < 0) return null;
+
+    const inv = inventory[invIdx];
+    const currentQty = Number(inv.qty || 0);
+    if (!Number.isInteger(currentQty) || currentQty <= 0) return null;
+
+    const categoryKey = String(inv.category || "").trim();
+    const installedParts = car.installedParts || [];
+    const existingInstalledIdx = installedParts.findIndex(p => String(p.categoryKey) === categoryKey);
+
+    let nextInventory = [...inventory];
+    let nextInstalledParts = [...installedParts];
+
+    // Reemplazo: devolver la vieja al inventario
+    if (existingInstalledIdx >= 0) {
+      const old = nextInstalledParts[existingInstalledIdx];
+      const oldInvIdx = nextInventory.findIndex(i => i.id === String(old.inventoryItemId));
+      if (oldInvIdx >= 0) {
+        nextInventory[oldInvIdx] = {
+          ...nextInventory[oldInvIdx],
+          qty: Number(nextInventory[oldInvIdx].qty || 0) + 1,
+        };
+      }
+      nextInstalledParts.splice(existingInstalledIdx, 1);
+    }
+
+    // Consumir stock
+    nextInventory[invIdx] = {
+      ...nextInventory[invIdx],
+      qty: currentQty - 1,
+    };
+
+    const installed = {
+      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+      inventoryItemId: String(inv.id),
+      partName: inv.partName,
+      category: inv.category || "",
+      categoryKey,
+      p: Number(inv.performance?.p ?? 0),
+      a: Number(inv.performance?.a ?? 0),
+      m: Number(inv.performance?.m ?? 0),
+      installedAt: new Date().toISOString(),
+    };
+    nextInstalledParts.unshift(installed);
+
+    const nextCars = [...cars];
+    nextCars[carIdx] = { ...car, installedParts: nextInstalledParts, isFinalized: false };
+
+    const next = {
+      ...existing,
+      cars: nextCars,
+      inventory: nextInventory,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async uninstallPart(teamId, { carId, installedPartId }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const cars = existing.cars || [];
+    const carIdx = cars.findIndex(c => c.id === String(carId));
+    if (carIdx < 0) return null;
+    const car = cars[carIdx];
+
+    const installedParts = car.installedParts || [];
+    const idx = installedParts.findIndex(p => p.id === String(installedPartId));
+    if (idx < 0) return null;
+
+    const removed = installedParts[idx];
+    const nextInstalledParts = [...installedParts];
+    nextInstalledParts.splice(idx, 1);
+
+    const inventory = existing.inventory || [];
+    const invIdx = inventory.findIndex(i => i.id === String(removed.inventoryItemId));
+    if (invIdx < 0) return null;
+
+    const nextInventory = [...inventory];
+    nextInventory[invIdx] = {
+      ...nextInventory[invIdx],
+      qty: Number(nextInventory[invIdx].qty || 0) + 1,
+    };
+
+    const nextCars = [...cars];
+    nextCars[carIdx] = { ...car, installedParts: nextInstalledParts, isFinalized: false };
+
+    const next = {
+      ...existing,
+      cars: nextCars,
+      inventory: nextInventory,
+      updatedAt: new Date().toISOString(),
+    };
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async assignCarDriver(teamId, { carId, driverId }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const cars = existing.cars || [];
+    const carIdx = cars.findIndex(c => c.id === String(carId));
+    if (carIdx < 0) return null;
+
+    if (driverId !== null && driverId !== undefined && driverId !== "") {
+      const ok = (existing.drivers || []).some(d => d.id === String(driverId));
+      if (!ok) return null;
+    }
+
+    const nextCars = [...cars];
+    nextCars[carIdx] = { ...cars[carIdx], driverId: driverId ? String(driverId) : null };
+
+    const next = { ...existing, cars: nextCars, updatedAt: new Date().toISOString() };
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async finalizeCar(teamId, { carId }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const cars = existing.cars || [];
+    const carIdx = cars.findIndex(c => c.id === String(carId));
+    if (carIdx < 0) return null;
+
+    const car = cars[carIdx];
+    if (!car.driverId) return null;
+    const installed = car.installedParts || [];
+    const required = [
+      "Power Unit",
+      "Paquete aerodinámico",
+      "Neumáticos",
+      "Suspensión",
+      "Caja de cambios",
+    ];
+
+    const hasAll = required.every(cat => installed.some(p => String(p.categoryKey) === cat));
+    if (!hasAll) return null;
+
+    const nextCars = [...cars];
+    nextCars[carIdx] = { ...car, isFinalized: true };
+    const next = { ...existing, cars: nextCars, updatedAt: new Date().toISOString() };
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async unfinalizeCar(teamId, { carId }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const cars = existing.cars || [];
+    const carIdx = cars.findIndex(c => c.id === String(carId));
+    if (carIdx < 0) return null;
+
+    const car = cars[carIdx];
+    const nextCars = [...cars];
+    nextCars[carIdx] = { ...car, isFinalized: false };
+
+    const next = { ...existing, cars: nextCars, updatedAt: new Date().toISOString() };
     this.byId.set(teamId, next);
     return next;
   }

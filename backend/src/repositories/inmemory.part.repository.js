@@ -31,4 +31,16 @@ export class InMemoryPartRepository extends PartRepository {
     this.byId.set(id, next);
     return next;
   }
+
+  async incrementStock(id, qty) {
+    const existing = await this.findById(id);
+    if (!existing) return null;
+
+    const nextStock = Number(existing.stock || 0) + Number(qty || 0);
+    if (nextStock < 0) return null;
+
+    const next = { ...existing, stock: nextStock, updatedAt: new Date().toISOString() };
+    this.byId.set(id, next);
+    return next;
+  }
 }

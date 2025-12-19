@@ -20,6 +20,14 @@ import { listTeams } from "../services/teams";
 import { listParts, createPart } from "../services/parts";
 import { purchasePart } from "../services/teams";
 
+const REQUIRED_CATEGORIES = [
+  "Power Unit",
+  "Paquete aerodinámico",
+  "Neumáticos",
+  "Suspensión",
+  "Caja de cambios",
+];
+
 export default function Store() {
   const session = getSession();
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
@@ -37,13 +45,26 @@ export default function Store() {
   const [partCategory, setPartCategory] = useState("");
   const [partPrice, setPartPrice] = useState("");
   const [partStock, setPartStock] = useState("");
-  const [perfSpeed, setPerfSpeed] = useState("");
-  const [perfHandling, setPerfHandling] = useState("");
-  const [perfReliability, setPerfReliability] = useState("");
+  const [perfP, setPerfP] = useState("");
+  const [perfA, setPerfA] = useState("");
+  const [perfM, setPerfM] = useState("");
 
   // purchase
   const [buyPartId, setBuyPartId] = useState("");
   const [buyQty, setBuyQty] = useState("");
+
+  const selectedTeam = useMemo(() => teams.find((t) => t.id === selectedTeamId) || null, [teams, selectedTeamId]);
+  const selectedPart = useMemo(() => parts.find((p) => p.id === buyPartId) || null, [parts, buyPartId]);
+
+  const budgetTotal = Number(selectedTeam?.budget?.total ?? 0);
+  const budgetSpent = Number(selectedTeam?.budget?.spent ?? 0);
+  const budgetAvailable = budgetTotal - budgetSpent;
+
+  const buyQtyNum = Number(buyQty);
+  const buyQtyValid = Number.isInteger(buyQtyNum) && buyQtyNum > 0;
+  const unitPrice = Number(selectedPart?.price ?? 0);
+  const totalCost = buyQtyValid ? unitPrice * buyQtyNum : 0;
+  const canAfford = !buyQtyValid ? true : budgetAvailable >= totalCost;
 
   async function reload() {
     setError("");
@@ -69,6 +90,16 @@ export default function Store() {
     }
   }
 
+  async function reloadTeamsOnly() {
+    try {
+      const t = await listTeams();
+      setTeams(t);
+      if (!selectedTeamId && t.length) setSelectedTeamId(t[0].id);
+    } catch (e) {
+      setError(e.message || "Error cargando equipos");
+    }
+  }
+
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,18 +115,18 @@ export default function Store() {
         price: Number(partPrice || 0),
         stock: Number(partStock || 0),
         performance: {
-          speed: Number(perfSpeed || 0),
-          handling: Number(perfHandling || 0),
-          reliability: Number(perfReliability || 0),
+          p: Number(perfP || 0),
+          a: Number(perfA || 0),
+          m: Number(perfM || 0),
         },
       });
       setPartName("");
       setPartCategory("");
       setPartPrice("");
       setPartStock("");
-      setPerfSpeed("");
-      setPerfHandling("");
-      setPerfReliability("");
+      setPerfP("");
+      setPerfA("");
+      setPerfM("");
       await reloadPartsOnly();
     } catch (e2) {
       setError(e2.message || "Error registrando parte");
@@ -107,9 +138,11 @@ export default function Store() {
     setError("");
     try {
       if (!selectedTeamId) throw new Error("Selecciona un equipo.");
+      if (!buyQtyValid) throw new Error("Cantidad inválida.");
+      if (!canAfford) throw new Error(`Presupuesto insuficiente. Disponible: ${budgetAvailable}. Costo: ${totalCost}.`);
       await purchasePart(selectedTeamId, { partId: buyPartId, qty: Number(buyQty) });
       setBuyQty("");
-      await reloadPartsOnly();
+      await Promise.all([reloadPartsOnly(), reloadTeamsOnly()]);
     } catch (e2) {
       setError(e2.message || "Error comprando parte");
     }
@@ -138,16 +171,28 @@ export default function Store() {
                   <Box component="form" onSubmit={onCreatePart}>
                     <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
                       <TextField label="Nombre" value={partName} onChange={(e) => setPartName(e.target.value)} fullWidth />
-                      <TextField label="Categoría" value={partCategory} onChange={(e) => setPartCategory(e.target.value)} fullWidth />
+                      <FormControl fullWidth>
+                        <InputLabel id="part-category-label">Categoría</InputLabel>
+                        <Select
+                          labelId="part-category-label"
+                          label="Categoría"
+                          value={partCategory}
+                          onChange={(e) => setPartCategory(e.target.value)}
+                        >
+                          {REQUIRED_CATEGORIES.map((c) => (
+                            <MenuItem key={c} value={c}>{c}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                       <TextField label="Precio" value={partPrice} onChange={(e) => setPartPrice(e.target.value)} fullWidth />
                       <TextField label="Stock" value={partStock} onChange={(e) => setPartStock(e.target.value)} fullWidth />
                       <Button type="submit" variant="contained">Guardar</Button>
                     </Stack>
 
                     <Stack spacing={2} direction={{ xs: "column", md: "row" }} sx={{ mt: 2 }}>
-                      <TextField label="Rendimiento: speed" value={perfSpeed} onChange={(e) => setPerfSpeed(e.target.value)} fullWidth />
-                      <TextField label="Rendimiento: handling" value={perfHandling} onChange={(e) => setPerfHandling(e.target.value)} fullWidth />
-                      <TextField label="Rendimiento: reliability" value={perfReliability} onChange={(e) => setPerfReliability(e.target.value)} fullWidth />
+                      <TextField label="Rendimiento: p" value={perfP} onChange={(e) => setPerfP(e.target.value)} fullWidth />
+                      <TextField label="Rendimiento: a" value={perfA} onChange={(e) => setPerfA(e.target.value)} fullWidth />
+                      <TextField label="Rendimiento: m" value={perfM} onChange={(e) => setPerfM(e.target.value)} fullWidth />
                     </Stack>
                   </Box>
                 </CardContent>
@@ -157,6 +202,28 @@ export default function Store() {
             <Card>
               <CardContent>
                 <Typography fontWeight={800} sx={{ mb: 1 }}>Comprar</Typography>
+
+                <Stack spacing={2} direction={{ xs: "column", md: "row" }} sx={{ mb: 2 }}>
+                  <TextField
+                    label="Presupuesto total"
+                    value={String(budgetTotal)}
+                    fullWidth
+                    InputProps={{ readOnly: true }}
+                  />
+                  <TextField
+                    label="Gastado"
+                    value={String(budgetSpent)}
+                    fullWidth
+                    InputProps={{ readOnly: true }}
+                  />
+                  <TextField
+                    label="Disponible"
+                    value={String(budgetAvailable)}
+                    fullWidth
+                    InputProps={{ readOnly: true }}
+                  />
+                </Stack>
+
                 <Box component="form" onSubmit={onPurchase}>
                   <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
                     <FormControl fullWidth>
@@ -189,13 +256,35 @@ export default function Store() {
                       </Select>
                     </FormControl>
 
-                    <TextField label="Cantidad" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} fullWidth />
+                    <TextField
+                      label="Cantidad"
+                      value={buyQty}
+                      onChange={(e) => setBuyQty(e.target.value)}
+                      fullWidth
+                    />
 
-                    <Button type="submit" variant="contained" disabled={!canEdit || !selectedTeamId || !buyPartId}>
+                    <TextField
+                      label="Costo"
+                      value={buyQtyValid ? String(totalCost) : "—"}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={!canEdit || !selectedTeamId || !buyPartId || !buyQtyValid || !canAfford}
+                    >
                       Comprar
                     </Button>
                   </Stack>
                 </Box>
+
+                {!canAfford && buyQtyValid ? (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    Presupuesto insuficiente: disponible {budgetAvailable} • costo {totalCost}
+                  </Alert>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -218,7 +307,7 @@ export default function Store() {
                               {p.category || "—"} • precio: {p.price} • stock: {p.stock}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              rendimiento: speed {p.performance?.speed ?? 0}, handling {p.performance?.handling ?? 0}, reliability {p.performance?.reliability ?? 0}
+                              rendimiento: p {p.performance?.p ?? 0}, a {p.performance?.a ?? 0}, m {p.performance?.m ?? 0}
                             </Typography>
                           </Box>
                         </CardContent>

@@ -1,6 +1,18 @@
+import crypto from "crypto";
+
 export class PartService {
   constructor(partRepo) {
     this.partRepo = partRepo;
+  }
+
+  static allowedCategories() {
+    return [
+      "Power Unit",
+      "Paquete aerodinámico",
+      "Neumáticos",
+      "Suspensión",
+      "Caja de cambios",
+    ];
   }
 
   async list() {
@@ -10,6 +22,12 @@ export class PartService {
   async create({ name, category, price, stock, performance }) {
     if (!name?.trim()) throw this._err(400, "Nombre de parte requerido.");
 
+    const cat = String(category || "").trim();
+    if (!cat) throw this._err(400, "Categoría requerida.");
+    if (!PartService.allowedCategories().includes(cat)) {
+      throw this._err(400, "Categoría inválida. Debe ser una de las 5 categorías obligatorias.");
+    }
+
     const numericPrice = Number(price);
     if (!Number.isFinite(numericPrice) || numericPrice < 0) throw this._err(400, "Precio inválido.");
 
@@ -17,16 +35,19 @@ export class PartService {
     if (!Number.isInteger(numericStock) || numericStock < 0) throw this._err(400, "Stock inválido.");
 
     const perf = performance || {};
-    const normalizedPerf = {
-      speed: perf.speed !== undefined ? Number(perf.speed) : 0,
-      handling: perf.handling !== undefined ? Number(perf.handling) : 0,
-      reliability: perf.reliability !== undefined ? Number(perf.reliability) : 0,
-    };
+    const p = Number(perf.p);
+    const a = Number(perf.a);
+    const m = Number(perf.m);
+    if (!Number.isInteger(p) || p < 0 || p > 9) throw this._err(400, "Rendimiento inválido: p debe ser entero 0-9.");
+    if (!Number.isInteger(a) || a < 0 || a > 9) throw this._err(400, "Rendimiento inválido: a debe ser entero 0-9.");
+    if (!Number.isInteger(m) || m < 0 || m > 9) throw this._err(400, "Rendimiento inválido: m debe ser entero 0-9.");
+
+    const normalizedPerf = { p, a, m };
 
     const part = {
-      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+      id: crypto.randomUUID ? crypto.randomUUID() : String(globalThis.crypto?.randomUUID?.() || Date.now()),
       name: name.trim(),
-      category: (category || "").trim(),
+      category: cat,
       price: numericPrice,
       stock: numericStock,
       performance: normalizedPerf,

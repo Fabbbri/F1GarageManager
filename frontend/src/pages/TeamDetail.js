@@ -3,10 +3,9 @@ import { useParams } from "react-router-dom";
 import {
   getTeam,
   addSponsor, deleteSponsor,
-  addCar, deleteCar,
+  deleteCar,
   addDriver, deleteDriver,
-  addDriverResult,
-  addInventoryItem, deleteInventoryItem
+  addDriverResult
 } from "../services/teams";
 import { getSession } from "../services/auth";
 import {
@@ -26,6 +25,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
 } from "@mui/material";
 
 function Section({ title, children }) {
@@ -55,8 +55,6 @@ export default function TeamDetail() {
   const [sContrib, setSContrib] = useState("");
   const [sDesc, setSDesc] = useState("");
 
-  const [carCode, setCarCode] = useState("");
-  const [carName, setCarName] = useState("");
 
   const [dName, setDName] = useState("");
   const [dSkill, setDSkill] = useState("");
@@ -69,11 +67,6 @@ export default function TeamDetail() {
   const [rRace, setRRace] = useState("");
   const [rPos, setRPos] = useState("");
   const [rPoints, setRPoints] = useState("");
-
-  const [pName, setPName] = useState("");
-  const [pCat, setPCat] = useState("");
-  const [pQty, setPQty] = useState("");
-  const [pCost, setPCost] = useState("");
 
   async function reload() {
     setError("");
@@ -110,13 +103,17 @@ export default function TeamDetail() {
     } catch (e2) { setError(e2.message); }
   };
 
-  const onAddCar = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const t = await addCar(id, { code: carCode, name: carName });
-      setTeam(t); setCarCode(""); setCarName("");
-    } catch (e2) { setError(e2.message); }
+  const pamTotals = (car) => {
+    const installed = car?.installedParts || [];
+    return installed.reduce(
+      (acc, p) => {
+        acc.p += Number(p.performance?.p ?? 0);
+        acc.a += Number(p.performance?.a ?? 0);
+        acc.m += Number(p.performance?.m ?? 0);
+        return acc;
+      },
+      { p: 0, a: 0, m: 0 }
+    );
   };
 
   const onAddDriver = async (e) => {
@@ -148,18 +145,10 @@ export default function TeamDetail() {
     }
   };
 
-  const onAddInv = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const t = await addInventoryItem(id, {
-        partName: pName, category: pCat, qty: Number(pQty || 0), unitCost: Number(pCost || 0)
-      });
-      setTeam(t); setPName(""); setPCat(""); setPQty(""); setPCost("");
-    } catch (e2) { setError(e2.message); }
-  };
 
   const budgetTotal = Number(team.budget?.total ?? 0);
+  const budgetSpent = Number(team.budget?.spent ?? 0);
+  const budgetAvailable = budgetTotal - budgetSpent;
   const contributionsTotal = (team.sponsors || []).reduce((s, sp) => s + Number(sp.contribution || 0), 0);
 
   const driverStats = (d) => {
@@ -202,12 +191,16 @@ export default function TeamDetail() {
           <Section title="Presupuesto">
             <Stack spacing={1}>
               <Typography color="text.secondary">
-                Regla: el presupuesto se calcula únicamente a partir de aportes registrados.
+                Regla: el presupuesto se calcula a partir de aportes registrados y las compras aumentan el gastado.
               </Typography>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField label="Total (calculado)" value={String(budgetTotal)} fullWidth InputProps={{ readOnly: true }} />
-                <TextField label="Aportes acumulados" value={String(contributionsTotal)} fullWidth InputProps={{ readOnly: true }} />
+                <TextField label="Gastado" value={String(budgetSpent)} fullWidth InputProps={{ readOnly: true }} />
+                <TextField label="Disponible" value={String(budgetAvailable)} fullWidth InputProps={{ readOnly: true }} />
               </Stack>
+              <Typography variant="body2" color="text.secondary">
+                Aportes acumulados (referencia): {String(contributionsTotal)}
+              </Typography>
             </Stack>
           </Section>
         )}
@@ -260,15 +253,9 @@ export default function TeamDetail() {
         {tab === 2 && (
           <Section title="Inventario">
             <Stack spacing={2}>
-              <Box component="form" onSubmit={onAddInv}>
-                <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
-                  <TextField label="Parte" value={pName} onChange={(e) => setPName(e.target.value)} fullWidth />
-                  <TextField label="Categoría" value={pCat} onChange={(e) => setPCat(e.target.value)} fullWidth />
-                  <TextField label="Cantidad" value={pQty} onChange={(e) => setPQty(e.target.value)} fullWidth />
-                  <TextField label="Costo unitario" value={pCost} onChange={(e) => setPCost(e.target.value)} fullWidth />
-                  <Button type="submit" variant="contained" disabled={!canEdit}>Agregar</Button>
-                </Stack>
-              </Box>
+              <Typography color="text.secondary">
+                El inventario es de solo lectura: se actualiza automáticamente con compras exitosas y con instalar/desinstalar partes en los carros.
+              </Typography>
 
               <Divider />
 
@@ -284,10 +271,12 @@ export default function TeamDetail() {
                           <Typography variant="body2" color="text.secondary">
                             {i.category || "—"} • qty: {i.qty} • unit: {i.unitCost}
                           </Typography>
+                          {(i.acquiredAt || i.createdAt) ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Adquirida: {new Date(i.acquiredAt || i.createdAt).toLocaleDateString()}
+                            </Typography>
+                          ) : null}
                         </Box>
-                        <Button disabled={!canEdit} onClick={async () => setTeam(await deleteInventoryItem(id, i.id))}>
-                          Eliminar
-                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -300,13 +289,9 @@ export default function TeamDetail() {
         {tab === 3 && (
           <Section title="Carros (máximo 2)">
             <Stack spacing={2}>
-              <Box component="form" onSubmit={onAddCar}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                  <TextField label="Código" value={carCode} onChange={(e) => setCarCode(e.target.value)} fullWidth />
-                  <TextField label="Nombre" value={carName} onChange={(e) => setCarName(e.target.value)} fullWidth />
-                  <Button type="submit" variant="contained" disabled={!canEdit}>Agregar</Button>
-                </Stack>
-              </Box>
+              <Alert severity="info">
+                El armado (instalar/desinstalar partes, asignar conductor y finalizar) se realiza desde la vista <b>Armado</b> del menú.
+              </Alert>
 
               <Divider />
 
@@ -320,6 +305,45 @@ export default function TeamDetail() {
                         <Box sx={{ flex: 1 }}>
                           <Typography fontWeight={800}>{c.code}</Typography>
                           <Typography variant="body2" color="text.secondary">{c.name || "—"}</Typography>
+
+                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+                            <Chip
+                              size="small"
+                              label={c.driverId ? "Conductor asignado" : "Sin conductor"}
+                              color={c.driverId ? "success" : "default"}
+                              variant={c.driverId ? "filled" : "outlined"}
+                            />
+                            <Chip
+                              size="small"
+                              label={c.isFinalized ? "Finalizado" : "No finalizado"}
+                              color={c.isFinalized ? "success" : "default"}
+                              variant={c.isFinalized ? "filled" : "outlined"}
+                            />
+                            <Chip
+                              size="small"
+                              label={`P ${pamTotals(c).p} / A ${pamTotals(c).a} / M ${pamTotals(c).m}`}
+                              variant="outlined"
+                            />
+                          </Stack>
+
+                          {(c.installedParts || []).length ? (
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="body2" color="text.secondary">Partes instaladas:</Typography>
+                              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                {(c.installedParts || []).map((p) => (
+                                  <Box key={p.id} sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                                    <Typography variant="body2" sx={{ flex: 1 }}>
+                                      {p.partName} ({p.category || "—"})
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            </Box>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Sin partes instaladas.
+                            </Typography>
+                          )}
                         </Box>
                         <Button disabled={!canEdit} onClick={async () => setTeam(await deleteCar(id, c.id))}>
                           Eliminar

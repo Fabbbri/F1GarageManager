@@ -6,6 +6,7 @@ import Signup from "../pages/Signup";
 import Dashboard from "../pages/Dashboard";
 import Teams from "../pages/Teams";
 import Store from "../pages/Store";
+import Assembly from "../pages/Assembly";
 
 import ProtectedRoute from "../components/ProtectedRoute";
 import AppShell from "../components/AppShell";
@@ -30,6 +31,7 @@ export default function AppRoutes() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/teams" element={<Teams />} />
+        <Route path="/assembly" element={<Assembly />} />
         <Route path="/store" element={<Store />} />
         <Route path="/teams/:id" element={<TeamDetail />} />
       </Route>
