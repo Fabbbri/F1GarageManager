@@ -5,7 +5,7 @@ export function makePartRoutes(partController) {
   const r = Router();
 
   r.get("/", requireAuth, requireRole("ADMIN", "ENGINEER"), partController.list);
-  r.post("/", requireAuth, requireRole("ADMIN", "ENGINEER"), partController.create);
+  r.post("/", requireAuth, requireRole("ADMIN"), partController.create);
   r.post("/:id/restock", requireAuth, requireRole("ADMIN"), partController.restock);
 
   return r;

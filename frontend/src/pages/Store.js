@@ -31,7 +31,7 @@ const REQUIRED_CATEGORIES = [
 
 export default function Store() {
   const session = getSession();
-  const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
+  const canEdit = useMemo(() => session?.role === "ADMIN", [session]);
   const canRestock = useMemo(() => session?.role === "ADMIN", [session]);
 
   const [error, setError] = useState("");
