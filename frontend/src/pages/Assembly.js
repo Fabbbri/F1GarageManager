@@ -237,6 +237,7 @@ export default function Assembly() {
 
   function CarSchematic() {
     const isLocked = Boolean(car?.isFinalized);
+    const activeInstalled = Boolean(installedByCategory.get(activeCategory));
 
     const zoneStyle = (cat, opts = {}) => {
       const st = categoryStatus(cat);
@@ -260,15 +261,26 @@ export default function Assembly() {
         };
       }
 
-      const isHot = st.isActive || st.isMissing || isHovered;
-      const stroke = isHot ? theme.palette.error.main : st.installed ? theme.palette.success.main : theme.palette.divider;
-      const fill = isHot
-        ? alpha(theme.palette.error.main, st.isActive ? 0.24 : isHovered ? 0.2 : 0.14)
-        : st.installed
-          ? alpha(theme.palette.success.main, 0.12)
-          : "transparent";
-      const animation = !isLocked && st.isActive ? "assemblyPulse 1.2s ease-in-out infinite" : "none";
+      const isHot = st.isActive || isHovered;
+      const hotMain = st.installed ? theme.palette.success.main : theme.palette.error.main;
 
+      const stroke = st.isMissing
+        ? theme.palette.error.main
+        : isHot
+          ? hotMain
+          : st.installed
+            ? theme.palette.success.main
+            : theme.palette.divider;
+
+      const fill = st.isMissing
+        ? alpha(theme.palette.error.main, 0.12)
+        : isHot
+          ? alpha(hotMain, st.isActive ? 0.22 : 0.18)
+          : st.installed
+            ? alpha(theme.palette.success.main, 0.10)
+            : "transparent";
+
+      const animation = !isLocked && st.isActive ? "assemblyPulse 1.2s ease-in-out infinite" : "none";
       const strokeWidth = isHovered ? 4 : 3;
 
       return {
@@ -521,7 +533,7 @@ export default function Assembly() {
           <Chip
             size="small"
             label={`Actual: ${activeCategory}`}
-            color={car?.isFinalized ? "default" : allRequiredInstalled ? "success" : "error"}
+            color={!activeCategory ? "default" : activeInstalled ? "success" : "error"}
           />
           <Chip
             size="small"
@@ -743,11 +755,7 @@ export default function Assembly() {
                         variant="outlined"
                         onClick={() => (car.isFinalized ? null : setFocusedCategory(cat))}
                         sx={{
-                          borderColor: allRequiredInstalled
-                            ? "divider"
-                            : isActive || !installed
-                              ? "error.main"
-                              : "divider",
+                          borderColor: installed ? "success.main" : "error.main",
                           cursor: car.isFinalized ? "default" : "pointer",
                         }}
                       >
