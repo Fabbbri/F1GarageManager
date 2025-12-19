@@ -73,34 +73,13 @@ export default function AppShell() {
 
       <Toolbar sx={{ px: 2 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography fontWeight={900} letterSpacing={0.2} noWrap sx={{ minWidth: 0 }}>
-            F1
-            <Box
-              component="span"
-              sx={{
-                display: "inline-block",
-                overflow: "hidden",
-                verticalAlign: "bottom",
-                maxWidth: desktopCollapsed ? 0 : 140,
-                opacity: desktopCollapsed ? 0 : 1,
-                transition: "max-width 180ms ease, opacity 180ms ease",
-              }}
-            >
-              {" "}Garage
-            </Box>
-          </Typography>
-
           <Typography
-            variant="caption"
-            color="text.secondary"
+            fontWeight={900}
+            letterSpacing={0.2}
             noWrap
-            sx={{
-              opacity: desktopCollapsed ? 0 : 1,
-              transform: desktopCollapsed ? "translateY(-2px)" : "translateY(0)",
-              transition: "opacity 180ms ease, transform 180ms ease",
-            }}
+            sx={{ minWidth: 0, fontStyle: desktopCollapsed ? "italic" : "normal" }}
           >
-            Manager
+            {desktopCollapsed ? "F1" : `Hola, ${session?.name || "—"}`}
           </Typography>
         </Box>
         <Box
@@ -156,20 +135,43 @@ export default function AppShell() {
           backdropFilter: "blur(10px)",
         }}
       >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={() => setMobileOpen((v) => !v)}
-            sx={{ mr: 2, display: { sm: "none" } }}
-            aria-label="open drawer"
-          >
-            <MenuIcon />
-          </IconButton>
+        <Toolbar
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "48px 1fr 48px",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={() => setMobileOpen((v) => !v)}
+              sx={{ display: { sm: "none" } }}
+              aria-label="open drawer"
+            >
+              <MenuIcon />
+            </IconButton>
+          </Box>
 
-          <Typography fontWeight={800} sx={{ flex: 1 }}>
-            Hola, {session?.name || "—"}
+          <Typography
+            component="div"
+            sx={{
+              justifySelf: "center",
+              textAlign: "center",
+              fontWeight: 900,
+              letterSpacing: 1.6,
+              textTransform: "uppercase",
+              fontStyle: "italic",
+              lineHeight: 1,
+              userSelect: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            F1 Garage Manager
           </Typography>
+
+          <Box />
         </Toolbar>
       </AppBar>
 
