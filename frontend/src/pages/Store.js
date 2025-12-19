@@ -8,6 +8,7 @@ import {
   TextField,
   Button,
   Alert,
+  Snackbar,
   Divider,
   FormControl,
   InputLabel,
@@ -33,6 +34,7 @@ export default function Store() {
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
 
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
 
   const [teams, setTeams] = useState([]);
@@ -136,12 +138,16 @@ export default function Store() {
   const onPurchase = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     try {
       if (!selectedTeamId) throw new Error("Selecciona un equipo.");
       if (!buyQtyValid) throw new Error("Cantidad inválida.");
       if (!canAfford) throw new Error(`Presupuesto insuficiente. Disponible: ${budgetAvailable}. Costo: ${totalCost}.`);
       await purchasePart(selectedTeamId, { partId: buyPartId, qty: Number(buyQty) });
       setBuyQty("");
+      setSuccess(
+        `Compra exitosa: ${selectedPart?.name || "Parte"} x${buyQtyNum} (costo ${totalCost}).`
+      );
       await Promise.all([reloadPartsOnly(), reloadTeamsOnly()]);
     } catch (e2) {
       setError(e2.message || "Error comprando parte");
@@ -159,6 +165,17 @@ export default function Store() {
         </Box>
 
         {error && <Alert severity="error">{error}</Alert>}
+
+        <Snackbar
+          open={Boolean(success)}
+          autoHideDuration={3500}
+          onClose={() => setSuccess("")}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert onClose={() => setSuccess("")} severity="success" variant="filled" sx={{ width: "100%" }}>
+            {success}
+          </Alert>
+        </Snackbar>
 
         {loading ? (
           <Typography color="text.secondary">Cargando...</Typography>
