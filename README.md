@@ -61,7 +61,20 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 	- Seleccioná la BD `F1GarageManager`.
 	- Ejecutá (F5). Esto crea/ajusta tablas `dbo.Teams` + tablas hijas y stored procedures `dbo.Team_*`.
 
+5. Ejecutar el script de catálogo de tienda (Parts):
+	- Abrí el archivo `database/schema/004_parts_catalog.sql`.
+	- Seleccioná la BD `F1GarageManager`.
+	- Ejecutá (F5). Esto crea la tabla `dbo.Parts` y stored procedures `dbo.Part_*`.
+
+6. Ejecutar el script de compra transaccional (auditoría + atomicidad):
+	- Abrí el archivo `database/schema/005_store_purchase_transaction.sql`.
+	- Seleccioná la BD `F1GarageManager`.
+	- Ejecutá (F5). Esto crea `dbo.TeamStorePurchases` y el SP `dbo.Store_PurchasePart`.
+
 > Nota: usamos la versión **nogo** porque evita `GO` y `THROW`, que en algunos entornos/ejecutores causan errores de sintaxis.
+
+> Importante: los scripts de `database/schema/*.sql` deben correrse con un usuario **admin/db_owner**.
+> El usuario `f1app` es para que la app ejecute stored procedures (EXECUTE), no para crear/alterar tablas, índices, FKs o SPs.
 
 ### 2) Habilitar conexión TCP (para que Node conecte)
 > SSMS a veces conecta por **Shared Memory**, pero el backend necesita **TCP/IP**.
@@ -83,6 +96,7 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 2. Creá/actualizá el archivo `backend/.env` con estos valores (ajustá usuario/clave):
 	- `USER_REPOSITORY=sqlserver`
 	- `TEAM_REPOSITORY=sqlserver` (para persistir equipos en BD)
+	- `PART_REPOSITORY=sqlserver` (catálogo de tienda en BD; si no se define, toma el valor de `TEAM_REPOSITORY`)
 	- `DB_SERVER=localhost`
 	- `DB_PORT=1433`
 	- `DB_DATABASE=F1GarageManager`
@@ -134,8 +148,13 @@ GO
 	- Abrir `database/schema/001_users.sql`
 	- Ejecutar (F5) apuntando a la BD `F1GarageManager`
 	- Si van a persistir equipos: abrir `database/schema/003_teams_relational_nogo.sql` y ejecutar (F5)
+	- Para catálogo de tienda: abrir `database/schema/004_parts_catalog.sql` y ejecutar (F5)
+	- Para compra transaccional + auditoría: abrir `database/schema/005_store_purchase_transaction.sql` y ejecutar (F5)
 
 > Si corrés los scripts con `f1app` y te salen errores de `CREATE/ALTER` o de columnas que “no existen”, conectate con tu usuario admin y volvélos a ejecutar.
+
+> Si venís de una versión anterior (catálogo in-memory) y tenés inventario duplicado, corré una sola vez:
+> `database/schema/006_fix_inventory_stacking.sql` (script de limpieza que apila por `TeamId+PartId`).
 
 ### B) Habilitar TCP/IP (para Node)
 1. SQL Server Configuration Manager → **Protocols for SQLEXPRESS** → Enable **TCP/IP**.
@@ -165,6 +184,9 @@ GO
 -- Así, aunque actualices/reescribas stored procedures, no tenés que volver a GRANT por cada SP.
 -- (Esto otorga EXECUTE sobre todos los SPs/funciones dentro de dbo.)
 GRANT EXECUTE ON SCHEMA::dbo TO f1app;
+
+-- (Opcional) Para que SSMS muestre objetos en el explorador con ese usuario:
+-- GRANT VIEW DEFINITION ON SCHEMA::dbo TO f1app;
 
 -- Alternativa (más prolija si querés): usar un rol.
 -- CREATE ROLE app_exec;
