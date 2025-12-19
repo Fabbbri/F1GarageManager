@@ -122,6 +122,8 @@ La contraseña del login **no es global**: depende del SQL Server local de cada 
 
 ### A) Crear BD y objetos
 1. En SSMS, conectarse a su instancia (ej: `localhost\SQLEXPRESS`).
+	 - Recomendado: conectarse con un usuario con permisos de **admin / sysadmin / db_owner**.
+	 - El usuario `f1app` es para que la app ejecute stored procedures, no para crear/alterar tablas o SPs.
 2. Crear la base (si no existe):
 ```sql
 IF DB_ID(N'F1GarageManager') IS NULL
@@ -132,6 +134,8 @@ GO
 	- Abrir `database/schema/001_users.sql`
 	- Ejecutar (F5) apuntando a la BD `F1GarageManager`
 	- Si van a persistir equipos: abrir `database/schema/003_teams_relational_nogo.sql` y ejecutar (F5)
+
+> Si corrés los scripts con `f1app` y te salen errores de `CREATE/ALTER` o de columnas que “no existen”, conectate con tu usuario admin y volvélos a ejecutar.
 
 ### B) Habilitar TCP/IP (para Node)
 1. SQL Server Configuration Manager → **Protocols for SQLEXPRESS** → Enable **TCP/IP**.
@@ -157,25 +161,17 @@ EXEC sp_addrolemember 'db_datareader', 'f1app';
 EXEC sp_addrolemember 'db_datawriter', 'f1app';
 GO
 
-GRANT EXECUTE ON dbo.User_Create TO f1app;
-GRANT EXECUTE ON dbo.User_GetByEmail TO f1app;
-GRANT EXECUTE ON dbo.User_GetById TO f1app;
+-- Recomendado: dar permisos por ESQUEMA una sola vez.
+-- Así, aunque actualices/reescribas stored procedures, no tenés que volver a GRANT por cada SP.
+-- (Esto otorga EXECUTE sobre todos los SPs/funciones dentro de dbo.)
+GRANT EXECUTE ON SCHEMA::dbo TO f1app;
 
--- Teams (requeridos si TEAM_REPOSITORY=sqlserver)
-GRANT EXECUTE ON dbo.Team_Create TO f1app;
-GRANT EXECUTE ON dbo.Team_Delete TO f1app;
-GRANT EXECUTE ON dbo.Team_GetById TO f1app;
-GRANT EXECUTE ON dbo.Team_List TO f1app;
-GRANT EXECUTE ON dbo.Team_Update TO f1app;
-GRANT EXECUTE ON dbo.Team_SetBudget TO f1app;
-GRANT EXECUTE ON dbo.Team_AddSponsor TO f1app;
-GRANT EXECUTE ON dbo.Team_RemoveSponsor TO f1app;
-GRANT EXECUTE ON dbo.Team_AddCar TO f1app;
-GRANT EXECUTE ON dbo.Team_RemoveCar TO f1app;
-GRANT EXECUTE ON dbo.Team_AddDriver TO f1app;
-GRANT EXECUTE ON dbo.Team_RemoveDriver TO f1app;
-GRANT EXECUTE ON dbo.Team_AddInventoryItem TO f1app;
-GRANT EXECUTE ON dbo.Team_RemoveInventoryItem TO f1app;
+-- Alternativa (más prolija si querés): usar un rol.
+-- CREATE ROLE app_exec;
+-- GRANT EXECUTE ON SCHEMA::dbo TO app_exec;
+-- ALTER ROLE app_exec ADD MEMBER f1app;
+
+-- Si preferís permisos por SP (más verboso), podés listar GRANTs individuales como antes.
 GO
 ```
 

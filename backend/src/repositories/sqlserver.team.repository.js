@@ -19,6 +19,8 @@ function mapTeamFromRecordsets(recordsets) {
     id: String(r.Id),
     name: r.Name,
     contribution: Number(r.Contribution ?? 0),
+    description: r.Description ?? "",
+    createdAt: iso(r.CreatedAt),
   }));
 
   const inventory = (recordsets?.[2] || []).map((r) => ({
@@ -52,6 +54,14 @@ function mapTeamFromRecordsets(recordsets) {
       spent: Number(teamRow.BudgetSpent ?? 0),
     },
     sponsors,
+    contributions: sponsors.map((s) => ({
+      id: s.id,
+      sponsorId: s.id,
+      sponsorName: s.name,
+      date: s.createdAt,
+      amount: Number(s.contribution ?? 0),
+      description: s.description ?? "",
+    })),
     inventory,
     cars,
     drivers,
@@ -72,6 +82,7 @@ function mapTeamFromListRow(row) {
       spent: Number(row.BudgetSpent ?? 0),
     },
     sponsors: [],
+    contributions: [],
     inventory: [],
     cars: [],
     drivers: [],
@@ -160,6 +171,7 @@ export class SqlServerTeamRepository extends TeamRepository {
         .input("SponsorId", sql.UniqueIdentifier, sponsor.id)
         .input("Name", sql.NVarChar(120), sponsor.name)
         .input("Contribution", sql.Decimal(18, 2), Number(sponsor.contribution ?? 0))
+        .input("Description", sql.NVarChar(300), sponsor.description || null)
         .execute("dbo.Team_AddSponsor");
 
       return mapTeamFromRecordsets(result.recordsets);

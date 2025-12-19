@@ -1,16 +1,31 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 import {
-  getTeam, patchBudget,
+  getTeam,
   addSponsor, deleteSponsor,
   addCar, deleteCar,
   addDriver, deleteDriver,
+  addDriverResult,
   addInventoryItem, deleteInventoryItem
 } from "../services/teams";
 import { getSession } from "../services/auth";
 import {
-  Box, Card, CardContent, Typography, Tabs, Tab, Stack, TextField, Button, Alert, Divider, CircularProgress
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Tabs,
+  Tab,
+  Stack,
+  TextField,
+  Button,
+  Alert,
+  Divider,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 
 function Section({ title, children }) {
@@ -26,7 +41,6 @@ function Section({ title, children }) {
 
 export default function TeamDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const session = getSession();
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
 
@@ -37,17 +51,24 @@ export default function TeamDetail() {
   const [loading, setLoading] = useState(true);
 
   // forms
-  const [total, setTotal] = useState("");
-  const [spent, setSpent] = useState("");
-
   const [sName, setSName] = useState("");
   const [sContrib, setSContrib] = useState("");
+  const [sDesc, setSDesc] = useState("");
 
   const [carCode, setCarCode] = useState("");
   const [carName, setCarName] = useState("");
 
   const [dName, setDName] = useState("");
   const [dSkill, setDSkill] = useState("");
+
+  const [rDriverId, setRDriverId] = useState("");
+  const [rDate, setRDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [rRace, setRRace] = useState("");
+  const [rPos, setRPos] = useState("");
+  const [rPoints, setRPoints] = useState("");
 
   const [pName, setPName] = useState("");
   const [pCat, setPCat] = useState("");
@@ -60,8 +81,6 @@ export default function TeamDetail() {
     try {
       const t = await getTeam(id);
       setTeam(t);
-      setTotal(String(t.budget?.total ?? 0));
-      setSpent(String(t.budget?.spent ?? 0));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -79,21 +98,15 @@ export default function TeamDetail() {
     );
   if (!team) return <Alert severity="error">{error || "Equipo no encontrado"}</Alert>;
 
-  const onBudget = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const t = await patchBudget(id, { total: Number(total), spent: Number(spent) });
-      setTeam(t);
-    } catch (e2) { setError(e2.message); }
-  };
-
   const onAddSponsor = async (e) => {
     e.preventDefault();
     setError("");
     try {
-      const t = await addSponsor(id, { name: sName, contribution: Number(sContrib || 0) });
-      setTeam(t); setSName(""); setSContrib("");
+      const t = await addSponsor(id, { name: sName, contribution: Number(sContrib || 0), description: sDesc });
+      setTeam(t);
+      setSName("");
+      setSContrib("");
+      setSDesc("");
     } catch (e2) { setError(e2.message); }
   };
 
@@ -110,9 +123,29 @@ export default function TeamDetail() {
     e.preventDefault();
     setError("");
     try {
-      const t = await addDriver(id, { name: dName, skill: Number(dSkill || 50) });
+      const maybeSkill = dSkill === "" ? 50 : Number(dSkill);
+      const t = await addDriver(id, { name: dName, skill: maybeSkill });
       setTeam(t); setDName(""); setDSkill("");
     } catch (e2) { setError(e2.message); }
+  };
+
+  const onAddDriverResult = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const t = await addDriverResult(id, rDriverId, {
+        date: rDate,
+        race: rRace,
+        position: Number(rPos),
+        points: Number(rPoints),
+      });
+      setTeam(t);
+      setRRace("");
+      setRPos("");
+      setRPoints("");
+    } catch (e2) {
+      setError(e2.message);
+    }
   };
 
   const onAddInv = async (e) => {
@@ -124,6 +157,19 @@ export default function TeamDetail() {
       });
       setTeam(t); setPName(""); setPCat(""); setPQty(""); setPCost("");
     } catch (e2) { setError(e2.message); }
+  };
+
+  const budgetTotal = Number(team.budget?.total ?? 0);
+  const contributionsTotal = (team.sponsors || []).reduce((s, sp) => s + Number(sp.contribution || 0), 0);
+
+  const driverStats = (d) => {
+    const results = d.results || [];
+    const races = results.length;
+    const avgPosition = races ? results.reduce((s, r) => s + Number(r.position || 0), 0) / races : 0;
+    const avgPoints = races ? results.reduce((s, r) => s + Number(r.points || 0), 0) / races : 0;
+    const bestPosition = races ? Math.min(...results.map(r => Number(r.position || Infinity))) : null;
+    const totalPoints = results.reduce((s, r) => s + Number(r.points || 0), 0);
+    return { races, avgPosition, avgPoints, bestPosition, totalPoints };
   };
 
   return (
@@ -154,13 +200,15 @@ export default function TeamDetail() {
 
         {tab === 0 && (
           <Section title="Presupuesto">
-            <Box component="form" onSubmit={onBudget}>
+            <Stack spacing={1}>
+              <Typography color="text.secondary">
+                Regla: el presupuesto se calcula únicamente a partir de aportes registrados.
+              </Typography>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Total" value={total} onChange={(e) => setTotal(e.target.value)} fullWidth />
-                <TextField label="Gastado" value={spent} onChange={(e) => setSpent(e.target.value)} fullWidth />
-                <Button type="submit" variant="contained" disabled={!canEdit}>Guardar</Button>
+                <TextField label="Total (calculado)" value={String(budgetTotal)} fullWidth InputProps={{ readOnly: true }} />
+                <TextField label="Aportes acumulados" value={String(contributionsTotal)} fullWidth InputProps={{ readOnly: true }} />
               </Stack>
-            </Box>
+            </Stack>
           </Section>
         )}
 
@@ -171,6 +219,7 @@ export default function TeamDetail() {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField label="Nombre" value={sName} onChange={(e) => setSName(e.target.value)} fullWidth />
                   <TextField label="Contribución" value={sContrib} onChange={(e) => setSContrib(e.target.value)} fullWidth />
+                  <TextField label="Descripción" value={sDesc} onChange={(e) => setSDesc(e.target.value)} fullWidth />
                   <Button type="submit" variant="contained" disabled={!canEdit}>Agregar</Button>
                 </Stack>
               </Box>
@@ -186,7 +235,15 @@ export default function TeamDetail() {
                       <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography fontWeight={800}>{s.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">Contribución: {s.contribution}</Typography>
+                          <Typography variant="body2" color="text.secondary">Contribución: {Number(s.contribution || 0)}</Typography>
+                          {s.createdAt ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Fecha: {new Date(s.createdAt).toLocaleDateString()}
+                            </Typography>
+                          ) : null}
+                          {s.description ? (
+                            <Typography variant="body2" color="text.secondary">Descripción: {s.description}</Typography>
+                          ) : null}
                         </Box>
                         <Button disabled={!canEdit} onClick={async () => setTeam(await deleteSponsor(id, s.id))}>
                           Eliminar
@@ -287,6 +344,40 @@ export default function TeamDetail() {
                 </Stack>
               </Box>
 
+              <Box component="form" onSubmit={onAddDriverResult}>
+                <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
+                  <FormControl fullWidth>
+                    <InputLabel id="driver-select-label">Conductor</InputLabel>
+                    <Select
+                      labelId="driver-select-label"
+                      label="Conductor"
+                      value={rDriverId}
+                      onChange={(e) => setRDriverId(e.target.value)}
+                    >
+                      {(team.drivers || []).map((d) => (
+                        <MenuItem key={d.id} value={d.id}>
+                          {d.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Fecha"
+                    type="date"
+                    value={rDate}
+                    onChange={(e) => setRDate(e.target.value)}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField label="Carrera" value={rRace} onChange={(e) => setRRace(e.target.value)} fullWidth />
+                  <TextField label="Posición" value={rPos} onChange={(e) => setRPos(e.target.value)} fullWidth />
+                  <TextField label="Puntos" value={rPoints} onChange={(e) => setRPoints(e.target.value)} fullWidth />
+                  <Button type="submit" variant="contained" disabled={!canEdit || !rDriverId}>
+                    Agregar resultado
+                  </Button>
+                </Stack>
+              </Box>
+
               <Divider />
 
               {team.drivers.length === 0 ? (
@@ -298,7 +389,10 @@ export default function TeamDetail() {
                       <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography fontWeight={800}>{d.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">Habilidad: {d.skill}</Typography>
+                          <Typography variant="body2" color="text.secondary">Habilidad (H): {d.skill}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            stats: carreras {driverStats(d).races} • prom pos {driverStats(d).avgPosition.toFixed(2)} • prom pts {driverStats(d).avgPoints.toFixed(2)} • mejor pos {driverStats(d).bestPosition ?? "—"} • total pts {driverStats(d).totalPoints}
+                          </Typography>
                         </Box>
                         <Button disabled={!canEdit} onClick={async () => setTeam(await deleteDriver(id, d.id))}>
                           Eliminar

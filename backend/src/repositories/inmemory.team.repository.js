@@ -41,9 +41,37 @@ export class InMemoryTeamRepository extends TeamRepository {
     const existing = await this.findById(teamId);
     if (!existing) return null;
 
+    const sponsors = [sponsor, ...(existing.sponsors || [])];
+    const total = sponsors.reduce((sum, s) => sum + Number(s.contribution || 0), 0);
+
     const next = {
       ...existing,
-      sponsors: [sponsor, ...(existing.sponsors || [])],
+      sponsors,
+      budget: {
+        ...(existing.budget || {}),
+        total,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async addContribution(teamId, contribution) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const contributions = [contribution, ...(existing.contributions || [])];
+    const total = contributions.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+    const next = {
+      ...existing,
+      contributions,
+      budget: {
+        ...(existing.budget || {}),
+        total,
+      },
       updatedAt: new Date().toISOString(),
     };
 
@@ -70,6 +98,33 @@ export class InMemoryTeamRepository extends TeamRepository {
     const next = {
       ...existing,
       drivers: [driver, ...(existing.drivers || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async addDriverResult(teamId, driverId, result) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const drivers = existing.drivers || [];
+    const idx = drivers.findIndex(d => d.id === driverId);
+    if (idx < 0) return null;
+
+    const driver = drivers[idx];
+    const nextDriver = {
+      ...driver,
+      results: [result, ...((driver.results || []))],
+    };
+
+    const nextDrivers = [...drivers];
+    nextDrivers[idx] = nextDriver;
+
+    const next = {
+      ...existing,
+      drivers: nextDrivers,
       updatedAt: new Date().toISOString(),
     };
 
@@ -122,6 +177,47 @@ export class InMemoryTeamRepository extends TeamRepository {
     const next = {
       ...existing,
       inventory: [item, ...(existing.inventory || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.byId.set(teamId, next);
+    return next;
+  }
+
+  async upsertInventoryFromPurchase(teamId, { partId, partName, category, qty, unitCost, performance }) {
+    const existing = await this.findById(teamId);
+    if (!existing) return null;
+
+    const inventory = existing.inventory || [];
+    const idx = inventory.findIndex(i => i.partId && partId && i.partId === partId);
+
+    let nextInventory;
+    if (idx >= 0) {
+      const current = inventory[idx];
+      const updatedItem = {
+        ...current,
+        qty: Number(current.qty || 0) + Number(qty || 0),
+        unitCost: unitCost !== undefined ? Number(unitCost) : Number(current.unitCost || 0),
+        performance: performance !== undefined ? performance : current.performance,
+      };
+      nextInventory = [...inventory];
+      nextInventory[idx] = updatedItem;
+    } else {
+      const item = {
+        id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+        partId,
+        partName,
+        category: category || "",
+        qty: Number(qty || 0),
+        unitCost: Number(unitCost || 0),
+        performance,
+      };
+      nextInventory = [item, ...inventory];
+    }
+
+    const next = {
+      ...existing,
+      inventory: nextInventory,
       updatedAt: new Date().toISOString(),
     };
 

@@ -18,6 +18,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import GroupsIcon from "@mui/icons-material/Groups";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 const drawerWidth = 260;
@@ -119,7 +120,10 @@ export default function AppShell() {
         <NavItem to="/dashboard" end icon={<DashboardIcon />} label="Dashboard" collapsed={desktopCollapsed} />
 
         {(isAdmin || isEngineer) && (
-          <NavItem to="/teams" icon={<GroupsIcon />} label="Equipos" collapsed={desktopCollapsed} />
+          <>
+            <NavItem to="/teams" icon={<GroupsIcon />} label="Equipos" collapsed={desktopCollapsed} />
+            <NavItem to="/store" icon={<StorefrontIcon />} label="Tienda" collapsed={desktopCollapsed} />
+          </>
         )}
       </List>
 

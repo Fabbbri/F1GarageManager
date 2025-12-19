@@ -13,8 +13,15 @@ export function makeTeamController(teamService) {
     addSponsor: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addSponsor(req.params.id, req.body) })),
     removeSponsor: asyncHandler(async (req, res) => res.json({ team: await teamService.removeSponsor(req.params.id, req.params.sponsorId) })),
 
+    addContribution: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addContribution(req.params.id, req.body) })),
+
     addDriver: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addDriver(req.params.id, req.body) })),
     removeDriver: asyncHandler(async (req, res) => res.json({ team: await teamService.removeDriver(req.params.id, req.params.driverId) })),
+
+    addDriverResult: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addDriverResult(req.params.id, req.params.driverId, req.body) })),
+    getDriverStats: asyncHandler(async (req, res) => res.json({ stats: await teamService.getDriverStats(req.params.id, req.params.driverId) })),
+
+    purchasePart: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.purchasePart(req.params.id, req.body) })),
 
     addCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addCar(req.params.id, req.body) })),
     removeCar: asyncHandler(async (req, res) => res.json({ team: await teamService.removeCar(req.params.id, req.params.carId) })),

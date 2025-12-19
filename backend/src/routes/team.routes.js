@@ -19,8 +19,15 @@ export function makeTeamRoutes(teamController) {
   r.post("/:id/sponsors", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addSponsor);
   r.delete("/:id/sponsors/:sponsorId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeSponsor);
 
+  r.post("/:id/contributions", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addContribution);
+
   r.post("/:id/drivers", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addDriver);
   r.delete("/:id/drivers/:driverId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeDriver);
+
+  r.post("/:id/drivers/:driverId/results", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addDriverResult);
+  r.get("/:id/drivers/:driverId/stats", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.getDriverStats);
+
+  r.post("/:id/store/purchase", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.purchasePart);
 
   r.post("/:id/cars", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addCar);
   r.delete("/:id/cars/:carId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeCar);

@@ -20,9 +20,22 @@ BEGIN
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Teams_CreatedAt DEFAULT (SYSUTCDATETIME()),
     UpdatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Teams_UpdatedAt DEFAULT (SYSUTCDATETIME())
   );
+END
 
-  CREATE INDEX IX_Teams_UpdatedAt ON dbo.Teams(UpdatedAt DESC);
-  CREATE INDEX IX_Teams_Name ON dbo.Teams(Name);
+-- Indexes (idempotent)
+IF OBJECT_ID('dbo.Teams', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_UpdatedAt')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_UpdatedAt')
+  BEGIN
+    CREATE INDEX IX_Teams_UpdatedAt ON dbo.Teams(UpdatedAt DESC);
+  END
+
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_Name')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_Name')
+  BEGIN
+    CREATE INDEX IX_Teams_Name ON dbo.Teams(Name);
+  END
 END
 
 -- If an older JSON-based column exists, remove it (keeps rows)
@@ -45,8 +58,15 @@ BEGIN
     CONSTRAINT FK_TeamBudgets_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamBudgets_NonNegative CHECK (Total >= 0 AND Spent >= 0 AND Spent <= Total)
   );
+END
 
-  CREATE INDEX IX_TeamBudgets_UpdatedAt ON dbo.TeamBudgets(UpdatedAt DESC);
+IF OBJECT_ID('dbo.TeamBudgets', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamBudgets') AND name = 'IX_TeamBudgets_UpdatedAt')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamBudgets') AND name = 'IX_TeamBudgets_UpdatedAt')
+  BEGIN
+    CREATE INDEX IX_TeamBudgets_UpdatedAt ON dbo.TeamBudgets(UpdatedAt DESC);
+  END
 END
 
 -- Sponsors
@@ -57,12 +77,26 @@ BEGIN
     TeamId UNIQUEIDENTIFIER NOT NULL,
     Name NVARCHAR(120) NOT NULL,
     Contribution DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamSponsors_Contribution DEFAULT (0),
+    Description NVARCHAR(300) NULL,
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamSponsors_CreatedAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT FK_TeamSponsors_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamSponsors_Contribution CHECK (Contribution >= 0)
   );
+END
 
-  CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TeamSponsors(TeamId);
+IF OBJECT_ID('dbo.TeamSponsors', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamSponsors') AND name = 'IX_TeamSponsors_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamSponsors') AND name = 'IX_TeamSponsors_TeamId')
+  BEGIN
+    CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TeamSponsors(TeamId);
+  END
+END
+
+-- Add Description if upgrading an existing database
+IF COL_LENGTH('dbo.TeamSponsors', 'Description') IS NULL
+BEGIN
+  ALTER TABLE dbo.TeamSponsors ADD Description NVARCHAR(300) NULL;
 END
 
 -- Cars (max 2 per team enforced in SP)
@@ -76,9 +110,21 @@ BEGIN
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamCars_CreatedAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT FK_TeamCars_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE
   );
+END
 
-  CREATE UNIQUE INDEX UX_TeamCars_TeamId_Code ON dbo.TeamCars(TeamId, Code);
-  CREATE INDEX IX_TeamCars_TeamId ON dbo.TeamCars(TeamId);
+IF OBJECT_ID('dbo.TeamCars', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'UX_TeamCars_TeamId_Code')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'UX_TeamCars_TeamId_Code')
+  BEGIN
+    CREATE UNIQUE INDEX UX_TeamCars_TeamId_Code ON dbo.TeamCars(TeamId, Code);
+  END
+
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'IX_TeamCars_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'IX_TeamCars_TeamId')
+  BEGIN
+    CREATE INDEX IX_TeamCars_TeamId ON dbo.TeamCars(TeamId);
+  END
 END
 
 -- Drivers
@@ -93,8 +139,15 @@ BEGIN
     CONSTRAINT FK_TeamDrivers_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamDrivers_Skill CHECK (Skill >= 0 AND Skill <= 100)
   );
+END
 
-  CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TeamDrivers(TeamId);
+IF OBJECT_ID('dbo.TeamDrivers', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamDrivers') AND name = 'IX_TeamDrivers_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamDrivers') AND name = 'IX_TeamDrivers_TeamId')
+  BEGIN
+    CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TeamDrivers(TeamId);
+  END
 END
 
 -- Inventory
@@ -111,8 +164,15 @@ BEGIN
     CONSTRAINT FK_TeamInventoryItems_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamInventoryItems_NonNegative CHECK (Qty >= 0 AND UnitCost >= 0)
   );
+END
 
-  CREATE INDEX IX_TeamInventoryItems_TeamId ON dbo.TeamInventoryItems(TeamId);
+IF OBJECT_ID('dbo.TeamInventoryItems', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'IX_TeamInventoryItems_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'IX_TeamInventoryItems_TeamId')
+  BEGIN
+    CREATE INDEX IX_TeamInventoryItems_TeamId ON dbo.TeamInventoryItems(TeamId);
+  END
 END
 
 -- Ensure every team has a budget row
@@ -129,8 +189,7 @@ WHERE b.TeamId IS NULL;
 DECLARE @sql NVARCHAR(MAX);
 
 -- Team_GetById
-IF OBJECT_ID('dbo.Team_GetById', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_GetById');
-SET @sql = N'CREATE PROCEDURE dbo.Team_GetById
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_GetById
   @Id UNIQUEIDENTIFIER
 AS
 BEGIN
@@ -148,7 +207,7 @@ BEGIN
   LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
   WHERE t.Id = @Id;
 
-  SELECT Id, TeamId, Name, Contribution
+  SELECT Id, TeamId, Name, Contribution, Description, CreatedAt
   FROM dbo.TeamSponsors
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
@@ -171,8 +230,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_List
-IF OBJECT_ID('dbo.Team_List', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_List');
-SET @sql = N'CREATE PROCEDURE dbo.Team_List
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_List
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -192,8 +250,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_Create
-IF OBJECT_ID('dbo.Team_Create', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Create');
-SET @sql = N'CREATE PROCEDURE dbo.Team_Create
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_Create
   @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
   @Country NVARCHAR(120) = NULL
@@ -229,8 +286,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_Update
-IF OBJECT_ID('dbo.Team_Update', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Update');
-SET @sql = N'CREATE PROCEDURE dbo.Team_Update
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_Update
   @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(120) = NULL,
   @Country NVARCHAR(120) = NULL
@@ -259,8 +315,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_SetBudget
-IF OBJECT_ID('dbo.Team_SetBudget', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_SetBudget');
-SET @sql = N'CREATE PROCEDURE dbo.Team_SetBudget
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_SetBudget
   @TeamId UNIQUEIDENTIFIER,
   @Total DECIMAL(18,2) = NULL,
   @Spent DECIMAL(18,2) = NULL
@@ -305,12 +360,12 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_AddSponsor
-IF OBJECT_ID('dbo.Team_AddSponsor', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddSponsor');
-SET @sql = N'CREATE PROCEDURE dbo.Team_AddSponsor
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddSponsor
   @TeamId UNIQUEIDENTIFIER,
   @SponsorId UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
-  @Contribution DECIMAL(18,2) = 0
+  @Contribution DECIMAL(18,2) = 0,
+  @Description NVARCHAR(300) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -331,8 +386,15 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TeamSponsors (Id, TeamId, Name, Contribution)
-  VALUES (@SponsorId, @TeamId, LTRIM(RTRIM(@Name)), @Contribution);
+  INSERT INTO dbo.TeamSponsors (Id, TeamId, Name, Contribution, Description)
+  VALUES (@SponsorId, @TeamId, LTRIM(RTRIM(@Name)), @Contribution, NULLIF(LTRIM(RTRIM(@Description)), ''''));
+
+  -- Regla: presupuesto total calculado a partir de aportes registrados
+  UPDATE dbo.TeamBudgets
+  SET
+    Total = COALESCE((SELECT SUM(s.Contribution) FROM dbo.TeamSponsors s WHERE s.TeamId = @TeamId), 0),
+    UpdatedAt = SYSUTCDATETIME()
+  WHERE TeamId = @TeamId;
 
   UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
@@ -340,8 +402,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_RemoveSponsor
-IF OBJECT_ID('dbo.Team_RemoveSponsor', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveSponsor');
-SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveSponsor
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveSponsor
   @TeamId UNIQUEIDENTIFIER,
   @SponsorId UNIQUEIDENTIFIER
 AS
@@ -361,8 +422,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_AddCar
-IF OBJECT_ID('dbo.Team_AddCar', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddCar');
-SET @sql = N'CREATE PROCEDURE dbo.Team_AddCar
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddCar
   @TeamId UNIQUEIDENTIFIER,
   @CarId UNIQUEIDENTIFIER,
   @Code NVARCHAR(40),
@@ -397,8 +457,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_RemoveCar
-IF OBJECT_ID('dbo.Team_RemoveCar', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveCar');
-SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveCar
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveCar
   @TeamId UNIQUEIDENTIFIER,
   @CarId UNIQUEIDENTIFIER
 AS
@@ -418,8 +477,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_AddDriver
-IF OBJECT_ID('dbo.Team_AddDriver', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddDriver');
-SET @sql = N'CREATE PROCEDURE dbo.Team_AddDriver
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddDriver
   @TeamId UNIQUEIDENTIFIER,
   @DriverId UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
@@ -453,8 +511,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_RemoveDriver
-IF OBJECT_ID('dbo.Team_RemoveDriver', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveDriver');
-SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveDriver
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveDriver
   @TeamId UNIQUEIDENTIFIER,
   @DriverId UNIQUEIDENTIFIER
 AS
@@ -474,8 +531,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_AddInventoryItem
-IF OBJECT_ID('dbo.Team_AddInventoryItem', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_AddInventoryItem');
-SET @sql = N'CREATE PROCEDURE dbo.Team_AddInventoryItem
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddInventoryItem
   @TeamId UNIQUEIDENTIFIER,
   @ItemId UNIQUEIDENTIFIER,
   @PartName NVARCHAR(160),
@@ -518,8 +574,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_RemoveInventoryItem
-IF OBJECT_ID('dbo.Team_RemoveInventoryItem', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_RemoveInventoryItem');
-SET @sql = N'CREATE PROCEDURE dbo.Team_RemoveInventoryItem
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveInventoryItem
   @TeamId UNIQUEIDENTIFIER,
   @ItemId UNIQUEIDENTIFIER
 AS
@@ -539,8 +594,7 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_Delete
-IF OBJECT_ID('dbo.Team_Delete', 'P') IS NOT NULL EXEC('DROP PROCEDURE dbo.Team_Delete');
-SET @sql = N'CREATE PROCEDURE dbo.Team_Delete
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_Delete
   @TeamId UNIQUEIDENTIFIER
 AS
 BEGIN

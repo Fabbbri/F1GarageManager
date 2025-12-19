@@ -1,6 +1,7 @@
 export class TeamService {
-  constructor(teamRepo) {
+  constructor(teamRepo, partRepo = null) {
     this.teamRepo = teamRepo;
+    this.partRepo = partRepo;
   }
 
   async list() {
@@ -25,6 +26,7 @@ export class TeamService {
 
       budget: { total: 0, spent: 0 },
       sponsors: [],
+      contributions: [],
       inventory: [],
       cars: [],
       drivers: [],
@@ -51,26 +53,27 @@ export class TeamService {
 
   // -------- Budget ----------
   async setBudget(id, { total, spent }) {
-    await this.getById(id);
-
-    const updated = await this.teamRepo.setBudget(id, {
-      total: total !== undefined ? Number(total) : undefined,
-      spent: spent !== undefined ? Number(spent) : undefined,
-    });
-
-    if (!updated) throw this._err(404, "Equipo no encontrado.");
-    return updated;
+    // Regla clave (6.4): el presupuesto se calcula únicamente a partir de aportes.
+    // Mantenemos el endpoint por compatibilidad pero no permitimos mutarlo manualmente.
+    throw this._err(400, "El presupuesto se calcula únicamente a partir de aportes registrados.");
   }
 
   // -------- Sponsors ----------
-  async addSponsor(teamId, { name, contribution }) {
+  async addSponsor(teamId, { name, contribution, description }) {
     await this.getById(teamId);
     if (!name?.trim()) throw this._err(400, "Nombre de patrocinador requerido.");
+
+    const numericContribution = Number(contribution || 0);
+    if (!Number.isFinite(numericContribution) || numericContribution < 0) {
+      throw this._err(400, "Contribución inválida.");
+    }
 
     const sponsor = {
       id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
       name: name.trim(),
-      contribution: Number(contribution || 0),
+      contribution: numericContribution,
+      description: (description || "").trim(),
+      createdAt: new Date().toISOString(),
     };
 
     const updated = await this.teamRepo.addSponsor(teamId, sponsor);
@@ -85,15 +88,49 @@ export class TeamService {
     return updated;
   }
 
+  // -------- Contributions (Budget source) ----------
+  async addContribution(teamId, { sponsorId, date, amount, description }) {
+    const team = await this.getById(teamId);
+
+    if (!sponsorId) throw this._err(400, "sponsorId requerido.");
+    const sponsor = (team.sponsors || []).find(s => s.id === String(sponsorId));
+    if (!sponsor) throw this._err(400, "Patrocinador inválido.");
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) throw this._err(400, "Monto inválido.");
+
+    const d = new Date(date);
+    if (!date || Number.isNaN(d.getTime())) throw this._err(400, "Fecha inválida.");
+
+    const contribution = {
+      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+      sponsorId: sponsor.id,
+      sponsorName: sponsor.name,
+      date: d.toISOString(),
+      amount: numericAmount,
+      description: (description || "").trim(),
+    };
+
+    const updated = await this.teamRepo.addContribution(teamId, contribution);
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
+    return updated;
+  }
+
   // -------- Drivers ----------
   async addDriver(teamId, { name, skill }) {
     await this.getById(teamId);
     if (!name?.trim()) throw this._err(400, "Nombre de conductor requerido.");
 
+    const numericSkill = Number(skill ?? 50);
+    if (!Number.isInteger(numericSkill) || numericSkill < 0 || numericSkill > 100) {
+      throw this._err(400, "Habilidad inválida: debe ser un entero entre 0 y 100.");
+    }
+
     const driver = {
       id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
       name: name.trim(),
-      skill: Number(skill ?? 50),
+      skill: numericSkill,
+      results: [],
     };
 
     const updated = await this.teamRepo.addDriver(teamId, driver);
@@ -105,6 +142,81 @@ export class TeamService {
     await this.getById(teamId);
     const updated = await this.teamRepo.removeDriver(teamId, driverId);
     if (!updated) throw this._err(404, "Conductor no encontrado.");
+    return updated;
+  }
+
+  async addDriverResult(teamId, driverId, { date, race, position, points }) {
+    const team = await this.getById(teamId);
+    const driver = (team.drivers || []).find(d => d.id === String(driverId));
+    if (!driver) throw this._err(404, "Conductor no encontrado.");
+
+    const d = new Date(date);
+    if (!date || Number.isNaN(d.getTime())) throw this._err(400, "Fecha inválida.");
+    if (!race?.trim()) throw this._err(400, "Carrera requerida.");
+
+    const pos = Number(position);
+    if (!Number.isInteger(pos) || pos <= 0) throw this._err(400, "Posición inválida.");
+
+    const pts = Number(points);
+    if (!Number.isFinite(pts) || pts < 0) throw this._err(400, "Puntos inválidos.");
+
+    const result = {
+      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
+      date: d.toISOString(),
+      race: race.trim(),
+      position: pos,
+      points: pts,
+    };
+
+    const updated = await this.teamRepo.addDriverResult(teamId, String(driverId), result);
+    if (!updated) throw this._err(404, "Equipo o conductor no encontrado.");
+    return updated;
+  }
+
+  async getDriverStats(teamId, driverId) {
+    const team = await this.getById(teamId);
+    const driver = (team.drivers || []).find(d => d.id === String(driverId));
+    if (!driver) throw this._err(404, "Conductor no encontrado.");
+
+    const results = driver.results || [];
+    const races = results.length;
+    const avgPosition = races ? results.reduce((s, r) => s + Number(r.position || 0), 0) / races : 0;
+    const avgPoints = races ? results.reduce((s, r) => s + Number(r.points || 0), 0) / races : 0;
+
+    return {
+      driverId: driver.id,
+      races,
+      avgPosition,
+      avgPoints,
+      bestPosition: races ? Math.min(...results.map(r => Number(r.position || Infinity))) : null,
+      totalPoints: results.reduce((s, r) => s + Number(r.points || 0), 0),
+    };
+  }
+
+  // -------- Store purchase ----------
+  async purchasePart(teamId, { partId, qty }) {
+    if (!this.partRepo) throw this._err(500, "Catálogo de partes no configurado.");
+    await this.getById(teamId);
+
+    if (!partId) throw this._err(400, "partId requerido.");
+    const nQty = Number(qty);
+    if (!Number.isInteger(nQty) || nQty <= 0) throw this._err(400, "Cantidad inválida.");
+
+    const part = await this.partRepo.findById(String(partId));
+    if (!part) throw this._err(404, "Parte no encontrada.");
+    if (Number(part.stock || 0) < nQty) throw this._err(400, "Stock insuficiente.");
+
+    await this.partRepo.decrementStock(String(partId), nQty);
+
+    const updated = await this.teamRepo.upsertInventoryFromPurchase(teamId, {
+      partId: part.id,
+      partName: part.name,
+      category: part.category,
+      qty: nQty,
+      unitCost: part.price,
+      performance: part.performance,
+    });
+    if (!updated) throw this._err(404, "Equipo no encontrado.");
     return updated;
   }
 

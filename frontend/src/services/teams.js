@@ -60,6 +60,22 @@ export async function deleteInventoryItem(teamId, itemId) {
   return (await handle(await fetch(`${API_URL}/teams/${teamId}/inventory/${itemId}`, { method: "DELETE", headers: headers() }))).team;
 }
 
+export async function addContribution(teamId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/contributions`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
+export async function addDriverResult(teamId, driverId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/drivers/${driverId}/results`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
+export async function getDriverStats(teamId, driverId) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/drivers/${driverId}/stats`, { headers: headers() }))).stats;
+}
+
+export async function purchasePart(teamId, payload) {
+  return (await handle(await fetch(`${API_URL}/teams/${teamId}/store/purchase`, { method: "POST", headers: headers(), body: JSON.stringify(payload) }))).team;
+}
+
 
 export async function deleteTeam(id) {
   const res = await fetch(`${API_URL}/teams/${id}`, {
