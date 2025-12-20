@@ -220,7 +220,7 @@ export default function AppShell() {
         sx={{
           flex: 1,
           p: 3,
-          pt: 10, // espacio por AppBar
+          pt: 12, // espacio por AppBar
           background:
             "radial-gradient(1200px circle at 20% 10%, rgba(255,30,30,0.10), transparent 55%), radial-gradient(900px circle at 80% 30%, rgba(0,200,255,0.08), transparent 60%)",
         }}
