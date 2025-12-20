@@ -43,14 +43,32 @@ export default function Login() {
     >
       <Stack spacing={3} alignItems="center">
         {/* CUADRO DE LOGIN */}
-        <Card sx={{ width: "100%", maxWidth: 430, backdropFilter: "blur(8px)" }}>
+        <Card
+          sx={(theme) => ({
+            width: "100%",
+            maxWidth: 430,
+            backdropFilter: "blur(8px)",
+            border: "1px solid",
+            borderColor: "divider",
+            animation: "authEnter 320ms ease",
+            transition: theme.transitions.create(["transform", "box-shadow"], { duration: 180 }),
+            "@keyframes authEnter": {
+              from: { opacity: 0, transform: "translateY(10px)" },
+              to: { opacity: 1, transform: "translateY(0)" },
+            },
+            "&:hover": {
+              transform: "translateY(-2px)",
+              boxShadow: theme.shadows[6],
+            },
+          })}
+        >
           <CardContent sx={{ p: 4 }}>
             <Stack spacing={2.2}>
               <Box>
-                <Typography variant="h4" fontWeight={800}>
+                <Typography variant="h4" fontWeight={900} textAlign="center">
                   F1 Garage Manager
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" textAlign="center">
                   Iniciá sesión para continuar
                 </Typography>
               </Box>
@@ -74,13 +92,21 @@ export default function Login() {
                     fullWidth
                     autoComplete="current-password"
                   />
-                  <Button type="submit" variant="contained" size="large">
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="large"
+                    sx={(theme) => ({
+                      transition: theme.transitions.create(["transform"], { duration: 160 }),
+                      "&:hover": { transform: "translateY(-1px)" },
+                    })}
+                  >
                     Entrar
                   </Button>
                 </Stack>
               </Box>
 
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" textAlign="center">
                 ¿No tenés cuenta?{" "}
                 <Link to="/signup" style={{ color: "inherit", fontWeight: 700 }}>
                   Crear cuenta
@@ -90,9 +116,6 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        
-
-        
         <Box sx={{ maxWidth: 430, textAlign: "center" }}>
           <Typography variant="caption" color="text.secondary">
             <b>¿Quiénes somos?</b>
