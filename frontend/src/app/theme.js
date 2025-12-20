@@ -8,7 +8,7 @@ const baseTheme = createTheme({
   },
   shape: { borderRadius: 14 },
   typography: {
-    fontFamily: ["Inter", "system-ui", "Arial"].join(","),
+    fontFamily: ["Onest", "AR One Sans", "Gruppo", "system-ui", "Arial"].join(","),
   },
 });
 
