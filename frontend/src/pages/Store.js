@@ -16,6 +16,13 @@ import {
   MenuItem,
 } from "@mui/material";
 
+import SpeedIcon from "@mui/icons-material/Speed";
+import AirIcon from "@mui/icons-material/Air";
+import TireRepairIcon from "@mui/icons-material/TireRepair";
+import TuneIcon from "@mui/icons-material/Tune";
+import SettingsIcon from "@mui/icons-material/Settings";
+import BuildIcon from "@mui/icons-material/Build";
+
 import { getSession } from "../services/auth";
 import { listTeams } from "../services/teams";
 import { listParts, createPart, restockPart } from "../services/parts";
@@ -28,6 +35,18 @@ const REQUIRED_CATEGORIES = [
   "Suspensión",
   "Caja de cambios",
 ];
+
+function getCategoryIcon(category) {
+  const c = String(category || "").trim().toLowerCase();
+
+  if (c.includes("power") || c.includes("pu") || c.includes("motor")) return <SpeedIcon />;
+  if (c.includes("aero") || c.includes("aerodin") || c.includes("aerodinám")) return <AirIcon />;
+  if (c.includes("neum") || c.includes("tire")) return <TireRepairIcon />;
+  if (c.includes("susp")) return <TuneIcon />;
+  if (c.includes("caja") || c.includes("camb") || c.includes("gear")) return <SettingsIcon />;
+
+  return <BuildIcon />;
+}
 
 export default function Store() {
   const session = getSession();
@@ -385,6 +404,24 @@ export default function Store() {
                     {parts.map((p) => (
                       <Card key={p.id} variant="outlined">
                         <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                          <Box
+                            sx={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 2,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flex: "0 0 auto",
+                              bgcolor: "action.hover",
+                              color: "primary.main",
+                              "& svg": { fontSize: 26 },
+                            }}
+                            aria-label={`Categoría: ${p.category || "—"}`}
+                            title={p.category || "—"}
+                          >
+                            {getCategoryIcon(p.category)}
+                          </Box>
                           <Box sx={{ flex: 1 }}>
                             <Typography fontWeight={800}>{p.name}</Typography>
                             <Typography variant="body2" color="text.secondary">
