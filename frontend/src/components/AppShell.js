@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getSession, logout } from "../services/auth";
 import {
   Box,
@@ -54,6 +54,8 @@ export default function AppShell() {
   const role = session?.role || "—";
   const isAdmin = useMemo(() => role === "ADMIN", [role]);
   const isEngineer = useMemo(() => role === "ENGINEER", [role]);
+
+  const location = useLocation();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopHover, setDesktopHover] = useState(false);
@@ -225,7 +227,18 @@ export default function AppShell() {
             "radial-gradient(1200px circle at 20% 10%, rgba(255,30,30,0.10), transparent 55%), radial-gradient(900px circle at 80% 30%, rgba(0,200,255,0.08), transparent 60%)",
         }}
       >
-        <Outlet />
+        <Box
+          key={location.pathname}
+          sx={{
+            animation: "pageEnter 320ms ease",
+            "@keyframes pageEnter": {
+              from: { opacity: 0, transform: "translateY(6px)" },
+              to: { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );
