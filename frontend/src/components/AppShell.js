@@ -125,7 +125,15 @@ export default function AppShell() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        background:
+          "radial-gradient(1200px circle at 20% 10%, rgba(255,30,30,0.10), transparent 55%), radial-gradient(900px circle at 80% 30%, rgba(0,200,255,0.08), transparent 60%)",
+      }}
+    >
       {/* Top bar */}
       <AppBar
         position="fixed"
@@ -186,6 +194,12 @@ export default function AppShell() {
             width: desktopCollapsed ? drawerCollapsedWidth : drawerWidth,
             boxSizing: "border-box",
             borderRight: "1px solid rgba(255,255,255,0.08)",
+            backgroundColor: "rgba(17, 24, 35, 0.26)",
+            backgroundImage:
+              "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+            backdropFilter: "blur(26px) saturate(160%)",
+            WebkitBackdropFilter: "blur(26px) saturate(160%)",
+            boxShadow: "inset -1px 0 0 rgba(255,255,255,0.06)",
             overflowX: "hidden",
             transition: "width 180ms ease",
           },
@@ -209,6 +223,12 @@ export default function AppShell() {
           "& .MuiDrawer-paper": {
             width: drawerWidth,
             boxSizing: "border-box",
+            backgroundColor: "rgba(17, 24, 35, 0.26)",
+            backgroundImage:
+              "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+            backdropFilter: "blur(26px) saturate(160%)",
+            WebkitBackdropFilter: "blur(26px) saturate(160%)",
+            boxShadow: "inset -1px 0 0 rgba(255,255,255,0.06)",
           },
         }}
         ModalProps={{ keepMounted: true }}
@@ -223,8 +243,6 @@ export default function AppShell() {
           flex: 1,
           p: 3,
           pt: 12, // espacio por AppBar
-          background:
-            "radial-gradient(1200px circle at 20% 10%, rgba(255,30,30,0.10), transparent 55%), radial-gradient(900px circle at 80% 30%, rgba(0,200,255,0.08), transparent 60%)",
         }}
       >
         <Box
