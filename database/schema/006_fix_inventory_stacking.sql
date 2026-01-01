@@ -13,15 +13,15 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.Parts', 'U') IS NULL
+IF OBJECT_ID('dbo.PART', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.Parts. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
+  RAISERROR('No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
   RETURN;
 END
 
-IF OBJECT_ID('dbo.TeamInventoryItems', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_INVENTORY_ITEM', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.TeamInventoryItems. Corré primero database/schema/003_teams_relational_nogo.sql.', 16, 1);
+  RAISERROR('No existe dbo.TEAM_INVENTORY_ITEM. Corré primero database/schema/003_teams_relational_nogo.sql.', 16, 1);
   RETURN;
 END
 
@@ -35,13 +35,13 @@ DECLARE @hadUx BIT = 0;
 IF EXISTS (
   SELECT 1
   FROM sys.indexes
-  WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems')
+  WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM')
     AND name = 'UX_TeamInventoryItems_TeamId_PartId'
 )
 BEGIN
   SET @hadUx = 1;
   BEGIN TRY
-    EXEC(N'DROP INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TeamInventoryItems;');
+    EXEC(N'DROP INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TEAM_INVENTORY_ITEM;');
   END TRY
   BEGIN CATCH
     DECLARE @msg0 NVARCHAR(4000) = N'No se pudo dropear el índice UX_TeamInventoryItems_TeamId_PartId. Corré este script con un usuario admin/db_owner. Error: ' + ERROR_MESSAGE();
@@ -66,11 +66,11 @@ END
     p.P AS NewP,
     p.A AS NewA,
     p.M AS NewM
-  FROM dbo.TeamInventoryItems ii
-  JOIN dbo.Parts p
+  FROM dbo.TEAM_INVENTORY_ITEM ii
+  JOIN dbo.PART p
     ON p.Name = ii.PartName
   WHERE ii.PartId IS NULL
-     OR NOT EXISTS (SELECT 1 FROM dbo.Parts px WHERE px.Id = ii.PartId)
+     OR NOT EXISTS (SELECT 1 FROM dbo.PART px WHERE px.Id = ii.PartId)
 )
 UPDATE ii
 SET
@@ -84,7 +84,7 @@ SET
     WHEN ii.UnitCost IS NULL OR ii.UnitCost = 0 THEN c.NewPrice
     ELSE ii.UnitCost
   END
-FROM dbo.TeamInventoryItems ii
+FROM dbo.TEAM_INVENTORY_ITEM ii
 JOIN Candidates c ON c.InventoryItemId = ii.Id;
 
 --------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ SELECT
   SUM(Qty) AS SumQty,
   MAX(UnitCost) AS MaxUnitCost,
   MAX(AcquiredAt) AS MaxAcquiredAt
-FROM dbo.TeamInventoryItems
+FROM dbo.TEAM_INVENTORY_ITEM
 WHERE PartId IS NOT NULL
 GROUP BY TeamId, PartId
 HAVING COUNT(*) > 1;
@@ -125,7 +125,7 @@ CREATE TABLE #DupItems (
 
 INSERT INTO #DupItems (Id, KeepId)
 SELECT ii.Id, g.KeepId
-FROM dbo.TeamInventoryItems ii
+FROM dbo.TEAM_INVENTORY_ITEM ii
 JOIN #DupGroups g
   ON g.TeamId = ii.TeamId AND g.PartId = ii.PartId
 WHERE ii.Id <> g.KeepId;
@@ -135,7 +135,7 @@ BEGIN
   -- Move installed-part references to the keeper inventory item
   UPDATE ip
   SET InventoryItemId = di.KeepId
-  FROM dbo.TeamCarInstalledParts ip
+  FROM dbo.TEAM_CAR_INSTALLED_PART ip
   JOIN #DupItems di
     ON ip.InventoryItemId = di.Id;
 
@@ -150,15 +150,15 @@ BEGIN
     P = p.P,
     A = p.A,
     M = p.M
-  FROM dbo.TeamInventoryItems keep
+  FROM dbo.TEAM_INVENTORY_ITEM keep
   JOIN #DupGroups g
     ON keep.Id = g.KeepId
-  JOIN dbo.Parts p
+  JOIN dbo.PART p
     ON p.Id = keep.PartId;
 
   -- Delete redundant rows
   DELETE ii
-  FROM dbo.TeamInventoryItems ii
+  FROM dbo.TEAM_INVENTORY_ITEM ii
   JOIN #DupItems di
     ON ii.Id = di.Id;
 END
@@ -168,12 +168,12 @@ END
 --------------------------------------------------------------------------------
 IF @hadUx = 1
    OR (
-     NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
+    NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
+    AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
    )
 BEGIN
   BEGIN TRY
-    EXEC(N'CREATE UNIQUE INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TeamInventoryItems(TeamId, PartId) WHERE PartId IS NOT NULL;');
+    EXEC(N'CREATE UNIQUE INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TEAM_INVENTORY_ITEM(TeamId, PartId) WHERE PartId IS NOT NULL;');
   END TRY
   BEGIN CATCH
     DECLARE @msgU NVARCHAR(4000) = N'No se pudo crear el índice único UX_TeamInventoryItems_TeamId_PartId. Error: ' + ERROR_MESSAGE();
@@ -187,12 +187,12 @@ COMMIT TRAN;
 
 -- Quick checks
 SELECT TOP 20 TeamId, PartId, PartName, Qty, UnitCost, AcquiredAt
-FROM dbo.TeamInventoryItems
+FROM dbo.TEAM_INVENTORY_ITEM
 WHERE PartId IS NOT NULL
 ORDER BY AcquiredAt DESC;
 
 SELECT TeamId, PartId, COUNT(1) AS RowsPerPart
-FROM dbo.TeamInventoryItems
+FROM dbo.TEAM_INVENTORY_ITEM
 WHERE PartId IS NOT NULL
 GROUP BY TeamId, PartId
 HAVING COUNT(1) > 1;

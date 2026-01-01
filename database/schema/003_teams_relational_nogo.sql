@@ -11,9 +11,9 @@
 SET NOCOUNT ON;
 
 -- Ensure Teams table exists
-IF OBJECT_ID('dbo.Teams', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.Teams (
+  CREATE TABLE dbo.TEAM (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_Teams PRIMARY KEY,
     Name NVARCHAR(120) NOT NULL,
     Country NVARCHAR(120) NULL,
@@ -23,86 +23,86 @@ BEGIN
 END
 
 -- Indexes (idempotent)
-IF OBJECT_ID('dbo.Teams', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_UpdatedAt')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_UpdatedAt')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM') AND name = 'IX_Teams_UpdatedAt')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM') AND name = 'IX_Teams_UpdatedAt')
   BEGIN
-    CREATE INDEX IX_Teams_UpdatedAt ON dbo.Teams(UpdatedAt DESC);
+    CREATE INDEX IX_Teams_UpdatedAt ON dbo.TEAM(UpdatedAt DESC);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_Name')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.Teams') AND name = 'IX_Teams_Name')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM') AND name = 'IX_Teams_Name')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM') AND name = 'IX_Teams_Name')
   BEGIN
-    CREATE INDEX IX_Teams_Name ON dbo.Teams(Name);
+    CREATE INDEX IX_Teams_Name ON dbo.TEAM(Name);
   END
 END
 
 -- If an older JSON-based column exists, remove it (keeps rows)
-IF COL_LENGTH('dbo.Teams', 'Data') IS NOT NULL
+IF COL_LENGTH('dbo.TEAM', 'Data') IS NOT NULL
 BEGIN
   IF OBJECT_ID('dbo.CK_Teams_Data_IsJson', 'C') IS NOT NULL
-    ALTER TABLE dbo.Teams DROP CONSTRAINT CK_Teams_Data_IsJson;
+    ALTER TABLE dbo.TEAM DROP CONSTRAINT CK_Teams_Data_IsJson;
 
-  ALTER TABLE dbo.Teams DROP COLUMN Data;
+  ALTER TABLE dbo.TEAM DROP COLUMN Data;
 END
 
 -- 1:1 Budget
-IF OBJECT_ID('dbo.TeamBudgets', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_BUDGET', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamBudgets (
+  CREATE TABLE dbo.TEAM_BUDGET (
     TeamId UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamBudgets PRIMARY KEY,
     Total DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamBudgets_Total DEFAULT (0),
     Spent DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamBudgets_Spent DEFAULT (0),
     UpdatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamBudgets_UpdatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamBudgets_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamBudgets_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamBudgets_NonNegative CHECK (Total >= 0 AND Spent >= 0 AND Spent <= Total)
   );
 END
 
-IF OBJECT_ID('dbo.TeamBudgets', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_BUDGET', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamBudgets') AND name = 'IX_TeamBudgets_UpdatedAt')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamBudgets') AND name = 'IX_TeamBudgets_UpdatedAt')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_BUDGET') AND name = 'IX_TeamBudgets_UpdatedAt')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_BUDGET') AND name = 'IX_TeamBudgets_UpdatedAt')
   BEGIN
-    CREATE INDEX IX_TeamBudgets_UpdatedAt ON dbo.TeamBudgets(UpdatedAt DESC);
+    CREATE INDEX IX_TeamBudgets_UpdatedAt ON dbo.TEAM_BUDGET(UpdatedAt DESC);
   END
 END
 
 -- Sponsors
-IF OBJECT_ID('dbo.TeamSponsors', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_SPONSOR', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamSponsors (
+  CREATE TABLE dbo.TEAM_SPONSOR (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamSponsors PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     Name NVARCHAR(120) NOT NULL,
     Contribution DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamSponsors_Contribution DEFAULT (0),
     Description NVARCHAR(300) NULL,
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamSponsors_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamSponsors_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamSponsors_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamSponsors_Contribution CHECK (Contribution >= 0)
   );
 END
 
-IF OBJECT_ID('dbo.TeamSponsors', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_SPONSOR', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamSponsors') AND name = 'IX_TeamSponsors_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamSponsors') AND name = 'IX_TeamSponsors_TeamId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_SPONSOR') AND name = 'IX_TeamSponsors_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_SPONSOR') AND name = 'IX_TeamSponsors_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TeamSponsors(TeamId);
+    CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TEAM_SPONSOR(TeamId);
   END
 END
 
 -- Add Description if upgrading an existing database
-IF COL_LENGTH('dbo.TeamSponsors', 'Description') IS NULL
+IF COL_LENGTH('dbo.TEAM_SPONSOR', 'Description') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamSponsors ADD Description NVARCHAR(300) NULL;
+  ALTER TABLE dbo.TEAM_SPONSOR ADD Description NVARCHAR(300) NULL;
 END
 
 -- Cars (max 2 per team enforced in SP)
-IF OBJECT_ID('dbo.TeamCars', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_CAR', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamCars (
+  CREATE TABLE dbo.TEAM_CAR (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamCars PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     Code NVARCHAR(40) NOT NULL,
@@ -110,62 +110,62 @@ BEGIN
     DriverId UNIQUEIDENTIFIER NULL,
     IsFinalized BIT NOT NULL CONSTRAINT DF_TeamCars_IsFinalized DEFAULT (0),
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamCars_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamCars_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE
+    CONSTRAINT FK_TeamCars_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE
   );
 END
 
 -- Add DriverId/IsFinalized if upgrading an existing database
-IF COL_LENGTH('dbo.TeamCars', 'DriverId') IS NULL
+IF COL_LENGTH('dbo.TEAM_CAR', 'DriverId') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamCars ADD DriverId UNIQUEIDENTIFIER NULL;
+  ALTER TABLE dbo.TEAM_CAR ADD DriverId UNIQUEIDENTIFIER NULL;
 END
-IF COL_LENGTH('dbo.TeamCars', 'IsFinalized') IS NULL
+IF COL_LENGTH('dbo.TEAM_CAR', 'IsFinalized') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamCars ADD IsFinalized BIT NOT NULL CONSTRAINT DF_TeamCars_IsFinalized DEFAULT (0);
+  ALTER TABLE dbo.TEAM_CAR ADD IsFinalized BIT NOT NULL CONSTRAINT DF_TeamCars_IsFinalized DEFAULT (0);
 END
 
-IF OBJECT_ID('dbo.TeamCars', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_CAR', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'UX_TeamCars_TeamId_Code')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'UX_TeamCars_TeamId_Code')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_CAR') AND name = 'UX_TeamCars_TeamId_Code')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_CAR') AND name = 'UX_TeamCars_TeamId_Code')
   BEGIN
-    CREATE UNIQUE INDEX UX_TeamCars_TeamId_Code ON dbo.TeamCars(TeamId, Code);
+    CREATE UNIQUE INDEX UX_TeamCars_TeamId_Code ON dbo.TEAM_CAR(TeamId, Code);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'IX_TeamCars_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCars') AND name = 'IX_TeamCars_TeamId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_CAR') AND name = 'IX_TeamCars_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_CAR') AND name = 'IX_TeamCars_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamCars_TeamId ON dbo.TeamCars(TeamId);
+    CREATE INDEX IX_TeamCars_TeamId ON dbo.TEAM_CAR(TeamId);
   END
 END
 
 -- Drivers
-IF OBJECT_ID('dbo.TeamDrivers', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_DRIVER', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamDrivers (
+  CREATE TABLE dbo.TEAM_DRIVER (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamDrivers PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     Name NVARCHAR(120) NOT NULL,
     Skill INT NOT NULL CONSTRAINT DF_TeamDrivers_Skill DEFAULT (50),
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamDrivers_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamDrivers_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamDrivers_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamDrivers_Skill CHECK (Skill >= 0 AND Skill <= 100)
   );
 END
 
-IF OBJECT_ID('dbo.TeamDrivers', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_DRIVER', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamDrivers') AND name = 'IX_TeamDrivers_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamDrivers') AND name = 'IX_TeamDrivers_TeamId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_DRIVER') AND name = 'IX_TeamDrivers_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_DRIVER') AND name = 'IX_TeamDrivers_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TeamDrivers(TeamId);
+    CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TEAM_DRIVER(TeamId);
   END
 END
 
 -- Inventory
-IF OBJECT_ID('dbo.TeamInventoryItems', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_INVENTORY_ITEM', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamInventoryItems (
+  CREATE TABLE dbo.TEAM_INVENTORY_ITEM (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamInventoryItems PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     PartId UNIQUEIDENTIFIER NULL,
@@ -178,89 +178,89 @@ BEGIN
     UnitCost DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamInventoryItems_UnitCost DEFAULT (0),
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_CreatedAt DEFAULT (SYSUTCDATETIME()),
     AcquiredAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_AcquiredAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamInventoryItems_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamInventoryItems_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamInventoryItems_NonNegative CHECK (Qty >= 0 AND UnitCost >= 0),
     CONSTRAINT CK_TeamInventoryItems_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
   );
 END
 
 -- Add PartId/AcquiredAt if upgrading an existing database
-IF COL_LENGTH('dbo.TeamInventoryItems', 'PartId') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartId') IS NULL
 BEGIN
   BEGIN TRY
-    ALTER TABLE dbo.TeamInventoryItems ADD PartId UNIQUEIDENTIFIER NULL;
+    ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD PartId UNIQUEIDENTIFIER NULL;
   END TRY
   BEGIN CATCH
-    RAISERROR('No se pudo agregar columna PartId a dbo.TeamInventoryItems. Corré este script con un usuario admin/db_owner y reintentá.', 16, 1);
+    RAISERROR('No se pudo agregar columna PartId a dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner y reintentá.', 16, 1);
     RETURN;
   END CATCH
 END
-IF COL_LENGTH('dbo.TeamInventoryItems', 'AcquiredAt') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'AcquiredAt') IS NULL
 BEGIN
   BEGIN TRY
-    ALTER TABLE dbo.TeamInventoryItems ADD AcquiredAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_AcquiredAt DEFAULT (SYSUTCDATETIME());
+    ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD AcquiredAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_AcquiredAt DEFAULT (SYSUTCDATETIME());
   END TRY
   BEGIN CATCH
-    RAISERROR('No se pudo agregar columna AcquiredAt a dbo.TeamInventoryItems. Corré este script con un usuario admin/db_owner y reintentá.', 16, 1);
+    RAISERROR('No se pudo agregar columna AcquiredAt a dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner y reintentá.', 16, 1);
     RETURN;
   END CATCH
 END
 
-IF COL_LENGTH('dbo.TeamInventoryItems', 'P') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'P') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamInventoryItems ADD P INT NOT NULL CONSTRAINT DF_TeamInventoryItems_P DEFAULT (0);
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD P INT NOT NULL CONSTRAINT DF_TeamInventoryItems_P DEFAULT (0);
 END
-IF COL_LENGTH('dbo.TeamInventoryItems', 'A') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'A') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamInventoryItems ADD A INT NOT NULL CONSTRAINT DF_TeamInventoryItems_A DEFAULT (0);
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD A INT NOT NULL CONSTRAINT DF_TeamInventoryItems_A DEFAULT (0);
 END
-IF COL_LENGTH('dbo.TeamInventoryItems', 'M') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'M') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamInventoryItems ADD M INT NOT NULL CONSTRAINT DF_TeamInventoryItems_M DEFAULT (0);
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD M INT NOT NULL CONSTRAINT DF_TeamInventoryItems_M DEFAULT (0);
 END
 
 -- Si por permisos/ejecución parcial las columnas no quedaron creadas, salir con un mensaje claro
-IF COL_LENGTH('dbo.TeamInventoryItems', 'PartId') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartId') IS NULL
 BEGIN
-  RAISERROR('La columna PartId no existe en dbo.TeamInventoryItems. Corré este script con un usuario admin/db_owner (no f1app) para aplicar el upgrade.', 16, 1);
+  RAISERROR('La columna PartId no existe en dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner (no f1app) para aplicar el upgrade.', 16, 1);
   RETURN;
 END
-IF COL_LENGTH('dbo.TeamInventoryItems', 'AcquiredAt') IS NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'AcquiredAt') IS NULL
 BEGIN
-  RAISERROR('La columna AcquiredAt no existe en dbo.TeamInventoryItems. Corré este script con un usuario admin/db_owner (no f1app) para aplicar el upgrade.', 16, 1);
-  RETURN;
-END
-
-IF COL_LENGTH('dbo.TeamInventoryItems', 'P') IS NULL OR COL_LENGTH('dbo.TeamInventoryItems', 'A') IS NULL OR COL_LENGTH('dbo.TeamInventoryItems', 'M') IS NULL
-BEGIN
-  RAISERROR('Faltan columnas P/A/M en dbo.TeamInventoryItems. Corré este script con un usuario admin/db_owner para aplicar el upgrade.', 16, 1);
+  RAISERROR('La columna AcquiredAt no existe en dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner (no f1app) para aplicar el upgrade.', 16, 1);
   RETURN;
 END
 
-IF OBJECT_ID('dbo.TeamInventoryItems', 'U') IS NOT NULL
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'P') IS NULL OR COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'A') IS NULL OR COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'M') IS NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'IX_TeamInventoryItems_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'IX_TeamInventoryItems_TeamId')
+  RAISERROR('Faltan columnas P/A/M en dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner para aplicar el upgrade.', 16, 1);
+  RETURN;
+END
+
+IF OBJECT_ID('dbo.TEAM_INVENTORY_ITEM', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'IX_TeamInventoryItems_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'IX_TeamInventoryItems_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamInventoryItems_TeamId ON dbo.TeamInventoryItems(TeamId);
+    CREATE INDEX IX_TeamInventoryItems_TeamId ON dbo.TEAM_INVENTORY_ITEM(TeamId);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamInventoryItems') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_INVENTORY_ITEM') AND name = 'UX_TeamInventoryItems_TeamId_PartId')
   BEGIN
-    IF COL_LENGTH('dbo.TeamInventoryItems', 'PartId') IS NOT NULL
+    IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartId') IS NOT NULL
     BEGIN
       -- SQL Server puede validar columnas en compile-time aun dentro de IF.
       -- Usamos SQL dinámico para que solo compile/ejecute si PartId existe.
-      EXEC(N'CREATE UNIQUE INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TeamInventoryItems(TeamId, PartId) WHERE PartId IS NOT NULL;');
+      EXEC(N'CREATE UNIQUE INDEX UX_TeamInventoryItems_TeamId_PartId ON dbo.TEAM_INVENTORY_ITEM(TeamId, PartId) WHERE PartId IS NOT NULL;');
     END
   END
 END
 
 -- Installed parts (per car)
-IF OBJECT_ID('dbo.TeamCarInstalledParts', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TeamCarInstalledParts (
+  CREATE TABLE dbo.TEAM_CAR_INSTALLED_PART (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamCarInstalledParts PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     CarId UNIQUEIDENTIFIER NOT NULL,
@@ -272,52 +272,52 @@ BEGIN
     A INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_A DEFAULT (0),
     M INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_M DEFAULT (0),
     InstalledAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamCarInstalledParts_InstalledAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamCarInstalledParts_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
-    CONSTRAINT FK_TeamCarInstalledParts_Cars FOREIGN KEY (CarId) REFERENCES dbo.TeamCars(Id),
-    CONSTRAINT FK_TeamCarInstalledParts_Inventory FOREIGN KEY (InventoryItemId) REFERENCES dbo.TeamInventoryItems(Id),
+    CONSTRAINT FK_TeamCarInstalledParts_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamCarInstalledParts_Cars FOREIGN KEY (CarId) REFERENCES dbo.TEAM_CAR(Id),
+    CONSTRAINT FK_TeamCarInstalledParts_Inventory FOREIGN KEY (InventoryItemId) REFERENCES dbo.TEAM_INVENTORY_ITEM(Id),
     CONSTRAINT CK_TeamCarInstalledParts_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
   );
 END
 
-IF COL_LENGTH('dbo.TeamCarInstalledParts', 'P') IS NULL
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'P') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamCarInstalledParts ADD P INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_P DEFAULT (0);
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD P INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_P DEFAULT (0);
 END
-IF COL_LENGTH('dbo.TeamCarInstalledParts', 'A') IS NULL
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'A') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamCarInstalledParts ADD A INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_A DEFAULT (0);
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD A INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_A DEFAULT (0);
 END
-IF COL_LENGTH('dbo.TeamCarInstalledParts', 'M') IS NULL
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'M') IS NULL
 BEGIN
-  ALTER TABLE dbo.TeamCarInstalledParts ADD M INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_M DEFAULT (0);
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD M INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_M DEFAULT (0);
 END
 
-IF OBJECT_ID('dbo.TeamCarInstalledParts', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'IX_TeamCarInstalledParts_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'IX_TeamCarInstalledParts_TeamId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'IX_TeamCarInstalledParts_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'IX_TeamCarInstalledParts_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamCarInstalledParts_TeamId ON dbo.TeamCarInstalledParts(TeamId);
+    CREATE INDEX IX_TeamCarInstalledParts_TeamId ON dbo.TEAM_CAR_INSTALLED_PART(TeamId);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'IX_TeamCarInstalledParts_CarId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'IX_TeamCarInstalledParts_CarId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'IX_TeamCarInstalledParts_CarId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'IX_TeamCarInstalledParts_CarId')
   BEGIN
-    CREATE INDEX IX_TeamCarInstalledParts_CarId ON dbo.TeamCarInstalledParts(CarId);
+    CREATE INDEX IX_TeamCarInstalledParts_CarId ON dbo.TEAM_CAR_INSTALLED_PART(CarId);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'UX_TeamCarInstalledParts_CarId_CategoryKey')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamCarInstalledParts') AND name = 'UX_TeamCarInstalledParts_CarId_CategoryKey')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'UX_TeamCarInstalledParts_CarId_CategoryKey')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART') AND name = 'UX_TeamCarInstalledParts_CarId_CategoryKey')
   BEGIN
-    CREATE UNIQUE INDEX UX_TeamCarInstalledParts_CarId_CategoryKey ON dbo.TeamCarInstalledParts(CarId, CategoryKey);
+    CREATE UNIQUE INDEX UX_TeamCarInstalledParts_CarId_CategoryKey ON dbo.TEAM_CAR_INSTALLED_PART(CarId, CategoryKey);
   END
 END
 
 -- Ensure every team has a budget row
-INSERT INTO dbo.TeamBudgets (TeamId)
+INSERT INTO dbo.TEAM_BUDGET (TeamId)
 SELECT t.Id
-FROM dbo.Teams t
-LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
+FROM dbo.TEAM t
+LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
 WHERE b.TeamId IS NULL;
 
 --------------------------------------------------------------------------------
@@ -341,32 +341,32 @@ BEGIN
     t.UpdatedAt,
     b.Total AS BudgetTotal,
     b.Spent AS BudgetSpent
-  FROM dbo.Teams t
-  LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
+  FROM dbo.TEAM t
+  LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
   WHERE t.Id = @Id;
 
   SELECT Id, TeamId, Name, Contribution, Description, CreatedAt
-  FROM dbo.TeamSponsors
+  FROM dbo.TEAM_SPONSOR
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
   SELECT Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, CreatedAt, AcquiredAt
-  FROM dbo.TeamInventoryItems
+  FROM dbo.TEAM_INVENTORY_ITEM
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
   SELECT Id, TeamId, Code, Name, DriverId, IsFinalized
-  FROM dbo.TeamCars
+  FROM dbo.TEAM_CAR
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 
   SELECT Id, TeamId, CarId, InventoryItemId, CategoryKey, PartName, Category, P, A, M, InstalledAt
-  FROM dbo.TeamCarInstalledParts
+  FROM dbo.TEAM_CAR_INSTALLED_PART
   WHERE TeamId = @Id
   ORDER BY InstalledAt DESC;
 
   SELECT Id, TeamId, Name, Skill
-  FROM dbo.TeamDrivers
+  FROM dbo.TEAM_DRIVER
   WHERE TeamId = @Id
   ORDER BY CreatedAt DESC;
 END';
@@ -386,8 +386,8 @@ BEGIN
     t.UpdatedAt,
     b.Total AS BudgetTotal,
     b.Spent AS BudgetSpent
-  FROM dbo.Teams t
-  LEFT JOIN dbo.TeamBudgets b ON b.TeamId = t.Id
+  FROM dbo.TEAM t
+  LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
   ORDER BY t.UpdatedAt DESC;
 END';
 EXEC sys.sp_executesql @sql;
@@ -408,7 +408,7 @@ BEGIN
     RETURN;
   END
 
-  IF EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @Id)
+  IF EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @Id)
   BEGIN
     RAISERROR(''Ya existe un equipo con ese ID.'', 16, 1);
     RETURN;
@@ -416,10 +416,10 @@ BEGIN
 
   BEGIN TRAN;
 
-  INSERT INTO dbo.Teams (Id, Name, Country)
+  INSERT INTO dbo.TEAM (Id, Name, Country)
   VALUES (@Id, LTRIM(RTRIM(@Name)), NULLIF(LTRIM(RTRIM(@Country)), ''''));
 
-  INSERT INTO dbo.TeamBudgets (TeamId, Total, Spent)
+  INSERT INTO dbo.TEAM_BUDGET (TeamId, Total, Spent)
   VALUES (@Id, 0, 0);
 
   COMMIT TRAN;
@@ -437,13 +437,13 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @Id)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @Id)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
 
-  UPDATE dbo.Teams
+  UPDATE dbo.TEAM
   SET
     Name = COALESCE(NULLIF(LTRIM(RTRIM(@Name)), ''''), Name),
     Country = CASE
@@ -466,7 +466,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -478,7 +478,7 @@ BEGIN
   SELECT
     @NextTotal = COALESCE(@Total, Total),
     @NextSpent = COALESCE(@Spent, Spent)
-  FROM dbo.TeamBudgets
+  FROM dbo.TEAM_BUDGET
   WHERE TeamId = @TeamId;
 
   IF @NextTotal < 0 OR @NextSpent < 0 OR @NextSpent > @NextTotal
@@ -487,14 +487,14 @@ BEGIN
     RETURN;
   END
 
-  UPDATE dbo.TeamBudgets
+  UPDATE dbo.TEAM_BUDGET
   SET
     Total = @NextTotal,
     Spent = @NextSpent,
     UpdatedAt = SYSUTCDATETIME()
   WHERE TeamId = @TeamId;
 
-  UPDATE dbo.Teams
+  UPDATE dbo.TEAM
   SET UpdatedAt = SYSUTCDATETIME()
   WHERE Id = @TeamId;
 
@@ -513,7 +513,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -529,17 +529,17 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TeamSponsors (Id, TeamId, Name, Contribution, Description)
+  INSERT INTO dbo.TEAM_SPONSOR (Id, TeamId, Name, Contribution, Description)
   VALUES (@SponsorId, @TeamId, LTRIM(RTRIM(@Name)), @Contribution, NULLIF(LTRIM(RTRIM(@Description)), ''''));
 
   -- Regla: presupuesto total calculado a partir de aportes registrados
-  UPDATE dbo.TeamBudgets
+  UPDATE dbo.TEAM_BUDGET
   SET
-    Total = COALESCE((SELECT SUM(s.Contribution) FROM dbo.TeamSponsors s WHERE s.TeamId = @TeamId), 0),
+    Total = COALESCE((SELECT SUM(s.Contribution) FROM dbo.TEAM_SPONSOR s WHERE s.TeamId = @TeamId), 0),
     UpdatedAt = SYSUTCDATETIME()
   WHERE TeamId = @TeamId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -552,14 +552,14 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  DELETE FROM dbo.TeamSponsors WHERE TeamId = @TeamId AND Id = @SponsorId;
+  DELETE FROM dbo.TEAM_SPONSOR WHERE TeamId = @TeamId AND Id = @SponsorId;
   IF @@ROWCOUNT = 0
   BEGIN
     RAISERROR(''Patrocinador no encontrado.'', 16, 1);
     RETURN;
   END
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -574,7 +574,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -585,16 +585,16 @@ BEGIN
     RETURN;
   END
 
-  IF (SELECT COUNT(1) FROM dbo.TeamCars WHERE TeamId = @TeamId) >= 2
+  IF (SELECT COUNT(1) FROM dbo.TEAM_CAR WHERE TeamId = @TeamId) >= 2
   BEGIN
     RAISERROR(''Restricción: máximo 2 carros por equipo.'', 16, 1);
     RETURN;
   END
 
-  INSERT INTO dbo.TeamCars (Id, TeamId, Code, Name, DriverId, IsFinalized)
+  INSERT INTO dbo.TEAM_CAR (Id, TeamId, Code, Name, DriverId, IsFinalized)
   VALUES (@CarId, @TeamId, LTRIM(RTRIM(@Code)), NULLIF(LTRIM(RTRIM(@Name)), ''''), NULL, 0);
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -608,30 +608,30 @@ BEGIN
   SET NOCOUNT ON;
 
   -- Devolver al inventario cualquier parte instalada en el carro
-  IF EXISTS (SELECT 1 FROM dbo.TeamCarInstalledParts WHERE TeamId = @TeamId AND CarId = @CarId)
+  IF EXISTS (SELECT 1 FROM dbo.TEAM_CAR_INSTALLED_PART WHERE TeamId = @TeamId AND CarId = @CarId)
   BEGIN
     ;WITH x AS (
       SELECT InventoryItemId, COUNT(1) AS Cnt
-      FROM dbo.TeamCarInstalledParts
+      FROM dbo.TEAM_CAR_INSTALLED_PART
       WHERE TeamId = @TeamId AND CarId = @CarId
       GROUP BY InventoryItemId
     )
     UPDATE i
     SET i.Qty = i.Qty + x.Cnt
-    FROM dbo.TeamInventoryItems i
+    FROM dbo.TEAM_INVENTORY_ITEM i
     INNER JOIN x ON x.InventoryItemId = i.Id;
 
-    DELETE FROM dbo.TeamCarInstalledParts WHERE TeamId = @TeamId AND CarId = @CarId;
+    DELETE FROM dbo.TEAM_CAR_INSTALLED_PART WHERE TeamId = @TeamId AND CarId = @CarId;
   END
 
-  DELETE FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId;
+  DELETE FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId;
   IF @@ROWCOUNT = 0
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
   END
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -652,7 +652,7 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -698,13 +698,13 @@ BEGIN
   SELECT
     @BudgetTotal = Total,
     @BudgetSpent = Spent
-  FROM dbo.TeamBudgets WITH (UPDLOCK, HOLDLOCK)
+  FROM dbo.TEAM_BUDGET WITH (UPDLOCK, HOLDLOCK)
   WHERE TeamId = @TeamId;
 
   IF @BudgetTotal IS NULL
   BEGIN
     -- Por seguridad: si falta la fila, crearla con 0.
-    INSERT INTO dbo.TeamBudgets (TeamId, Total, Spent) VALUES (@TeamId, 0, 0);
+    INSERT INTO dbo.TEAM_BUDGET (TeamId, Total, Spent) VALUES (@TeamId, 0, 0);
     SET @BudgetTotal = 0;
     SET @BudgetSpent = 0;
   END
@@ -716,15 +716,15 @@ BEGIN
     RETURN;
   END
 
-  UPDATE dbo.TeamBudgets
+  UPDATE dbo.TEAM_BUDGET
   SET
     Spent = Spent + @TotalCost,
     UpdatedAt = SYSUTCDATETIME()
   WHERE TeamId = @TeamId;
 
-  IF EXISTS (SELECT 1 FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND PartId = @PartId)
+  IF EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM WHERE TeamId = @TeamId AND PartId = @PartId)
   BEGIN
-    UPDATE dbo.TeamInventoryItems
+    UPDATE dbo.TEAM_INVENTORY_ITEM
     SET
       Qty = Qty + @Qty,
       UnitCost = @UnitCost,
@@ -737,11 +737,11 @@ BEGIN
   END
   ELSE
   BEGIN
-    INSERT INTO dbo.TeamInventoryItems (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, AcquiredAt)
+    INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, AcquiredAt)
     VALUES (NEWID(), @TeamId, @PartId, LTRIM(RTRIM(@PartName)), @Category, @P, @A, @M, @Qty, @UnitCost, SYSUTCDATETIME());
   END
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -759,22 +759,22 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND Id = @InventoryItemId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM WHERE TeamId = @TeamId AND Id = @InventoryItemId)
   BEGIN
     RAISERROR(''Ítem de inventario no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND Id = @InventoryItemId AND Qty > 0)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM WHERE TeamId = @TeamId AND Id = @InventoryItemId AND Qty > 0)
   BEGIN
     RAISERROR(''Stock insuficiente.'', 16, 1);
     RETURN;
@@ -794,7 +794,7 @@ BEGIN
     @P = P,
     @A = A,
     @M = M
-  FROM dbo.TeamInventoryItems
+  FROM dbo.TEAM_INVENTORY_ITEM
   WHERE TeamId = @TeamId AND Id = @InventoryItemId;
 
   IF @CategoryKey NOT IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'')
@@ -811,20 +811,20 @@ BEGIN
   SELECT TOP (1)
     @OldInstalledId = Id,
     @OldInventoryItemId = InventoryItemId
-  FROM dbo.TeamCarInstalledParts
+  FROM dbo.TEAM_CAR_INSTALLED_PART
   WHERE TeamId = @TeamId AND CarId = @CarId AND CategoryKey = @CategoryKey;
 
   IF @OldInstalledId IS NOT NULL
   BEGIN
-    UPDATE dbo.TeamInventoryItems
+    UPDATE dbo.TEAM_INVENTORY_ITEM
     SET Qty = Qty + 1
     WHERE TeamId = @TeamId AND Id = @OldInventoryItemId;
 
-    DELETE FROM dbo.TeamCarInstalledParts
+    DELETE FROM dbo.TEAM_CAR_INSTALLED_PART
     WHERE TeamId = @TeamId AND Id = @OldInstalledId;
   END
 
-  UPDATE dbo.TeamInventoryItems
+  UPDATE dbo.TEAM_INVENTORY_ITEM
   SET Qty = Qty - 1
   WHERE TeamId = @TeamId AND Id = @InventoryItemId AND Qty > 0;
   IF @@ROWCOUNT = 0
@@ -834,12 +834,12 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TeamCarInstalledParts (Id, TeamId, CarId, InventoryItemId, CategoryKey, PartName, Category, P, A, M)
+  INSERT INTO dbo.TEAM_CAR_INSTALLED_PART (Id, TeamId, CarId, InventoryItemId, CategoryKey, PartName, Category, P, A, M)
   VALUES (NEWID(), @TeamId, @CarId, @InventoryItemId, @CategoryKey, @PartName, @Category, @P, @A, @M);
 
-  UPDATE dbo.TeamCars SET IsFinalized = 0 WHERE TeamId = @TeamId AND Id = @CarId;
+  UPDATE dbo.TEAM_CAR SET IsFinalized = 0 WHERE TeamId = @TeamId AND Id = @CarId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -857,12 +857,12 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
@@ -870,7 +870,7 @@ BEGIN
 
   DECLARE @InventoryItemId UNIQUEIDENTIFIER;
   SELECT @InventoryItemId = InventoryItemId
-  FROM dbo.TeamCarInstalledParts
+  FROM dbo.TEAM_CAR_INSTALLED_PART
   WHERE TeamId = @TeamId AND CarId = @CarId AND Id = @InstalledPartId;
 
   IF @InventoryItemId IS NULL
@@ -881,16 +881,16 @@ BEGIN
 
   BEGIN TRAN;
 
-  DELETE FROM dbo.TeamCarInstalledParts
+  DELETE FROM dbo.TEAM_CAR_INSTALLED_PART
   WHERE TeamId = @TeamId AND CarId = @CarId AND Id = @InstalledPartId;
 
-  UPDATE dbo.TeamInventoryItems
+  UPDATE dbo.TEAM_INVENTORY_ITEM
   SET Qty = Qty + 1
   WHERE TeamId = @TeamId AND Id = @InventoryItemId;
 
-  UPDATE dbo.TeamCars SET IsFinalized = 0 WHERE TeamId = @TeamId AND Id = @CarId;
+  UPDATE dbo.TEAM_CAR SET IsFinalized = 0 WHERE TeamId = @TeamId AND Id = @CarId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -908,17 +908,17 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
   END
-  IF @DriverId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.TeamDrivers WHERE TeamId = @TeamId AND Id = @DriverId)
+  IF @DriverId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.TEAM_DRIVER WHERE TeamId = @TeamId AND Id = @DriverId)
   BEGIN
     RAISERROR(''Conductor no encontrado.'', 16, 1);
     RETURN;
@@ -926,11 +926,11 @@ BEGIN
 
   BEGIN TRAN;
 
-  UPDATE dbo.TeamCars
+  UPDATE dbo.TEAM_CAR
   SET DriverId = @DriverId
   WHERE TeamId = @TeamId AND Id = @CarId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -947,12 +947,12 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
@@ -960,7 +960,7 @@ BEGIN
 
   DECLARE @DriverId UNIQUEIDENTIFIER;
   SELECT @DriverId = DriverId
-  FROM dbo.TeamCars
+  FROM dbo.TEAM_CAR
   WHERE TeamId = @TeamId AND Id = @CarId;
 
   IF @DriverId IS NULL
@@ -971,7 +971,7 @@ BEGIN
 
   DECLARE @RequiredCount INT;
   SELECT @RequiredCount = COUNT(DISTINCT CategoryKey)
-  FROM dbo.TeamCarInstalledParts
+  FROM dbo.TEAM_CAR_INSTALLED_PART
   WHERE TeamId = @TeamId AND CarId = @CarId
     AND CategoryKey IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'');
 
@@ -983,11 +983,11 @@ BEGIN
 
   BEGIN TRAN;
 
-  UPDATE dbo.TeamCars
+  UPDATE dbo.TEAM_CAR
   SET IsFinalized = 1
   WHERE TeamId = @TeamId AND Id = @CarId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -1004,12 +1004,12 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
   END
-  IF NOT EXISTS (SELECT 1 FROM dbo.TeamCars WHERE TeamId = @TeamId AND Id = @CarId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
   BEGIN
     RAISERROR(''Carro no encontrado.'', 16, 1);
     RETURN;
@@ -1017,11 +1017,11 @@ BEGIN
 
   BEGIN TRAN;
 
-  UPDATE dbo.TeamCars
+  UPDATE dbo.TEAM_CAR
   SET IsFinalized = 0
   WHERE TeamId = @TeamId AND Id = @CarId;
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
   COMMIT TRAN;
 
@@ -1039,7 +1039,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -1055,10 +1055,10 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TeamDrivers (Id, TeamId, Name, Skill)
+  INSERT INTO dbo.TEAM_DRIVER (Id, TeamId, Name, Skill)
   VALUES (@DriverId, @TeamId, LTRIM(RTRIM(@Name)), @Skill);
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -1071,14 +1071,14 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  DELETE FROM dbo.TeamDrivers WHERE TeamId = @TeamId AND Id = @DriverId;
+  DELETE FROM dbo.TEAM_DRIVER WHERE TeamId = @TeamId AND Id = @DriverId;
   IF @@ROWCOUNT = 0
   BEGIN
     RAISERROR(''Conductor no encontrado.'', 16, 1);
     RETURN;
   END
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -1095,7 +1095,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
   BEGIN
     RAISERROR(''Equipo no encontrado.'', 16, 1);
     RETURN;
@@ -1111,7 +1111,7 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TeamInventoryItems (Id, TeamId, PartName, Category, Qty, UnitCost, AcquiredAt)
+  INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartName, Category, Qty, UnitCost, AcquiredAt)
   VALUES (
     @ItemId,
     @TeamId,
@@ -1122,7 +1122,7 @@ BEGIN
     SYSUTCDATETIME()
   );
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -1135,20 +1135,20 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF EXISTS (SELECT 1 FROM dbo.TeamCarInstalledParts WHERE TeamId = @TeamId AND InventoryItemId = @ItemId)
+  IF EXISTS (SELECT 1 FROM dbo.TEAM_CAR_INSTALLED_PART WHERE TeamId = @TeamId AND InventoryItemId = @ItemId)
   BEGIN
     RAISERROR(''No podés eliminar una parte que está instalada en un carro.'', 16, 1);
     RETURN;
   END
 
-  DELETE FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND Id = @ItemId;
+  DELETE FROM dbo.TEAM_INVENTORY_ITEM WHERE TeamId = @TeamId AND Id = @ItemId;
   IF @@ROWCOUNT = 0
   BEGIN
     RAISERROR(''Ítem de inventario no encontrado.'', 16, 1);
     RETURN;
   END
 
-  UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
@@ -1160,7 +1160,7 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  DELETE FROM dbo.Teams WHERE Id = @TeamId;
+  DELETE FROM dbo.TEAM WHERE Id = @TeamId;
   SELECT @@ROWCOUNT AS affected;
 END';
 EXEC sys.sp_executesql @sql;

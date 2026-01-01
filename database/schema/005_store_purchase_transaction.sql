@@ -14,9 +14,9 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.Parts', 'U') IS NULL
+IF OBJECT_ID('dbo.PART', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.Parts. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
+  RAISERROR('No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
   RETURN;
 END
 
@@ -24,9 +24,9 @@ END
 -- Audit / History
 --------------------------------------------------------------------------------
 BEGIN TRY
-  IF OBJECT_ID('dbo.TeamStorePurchases', 'U') IS NULL
+  IF OBJECT_ID('dbo.TEAM_STORE_PURCHASE', 'U') IS NULL
   BEGIN
-    CREATE TABLE dbo.TeamStorePurchases (
+    CREATE TABLE dbo.TEAM_STORE_PURCHASE (
       Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamStorePurchases PRIMARY KEY,
       TeamId UNIQUEIDENTIFIER NOT NULL,
       PartId UNIQUEIDENTIFIER NOT NULL,
@@ -39,8 +39,8 @@ BEGIN TRY
       A INT NOT NULL CONSTRAINT DF_TeamStorePurchases_A DEFAULT (0),
       M INT NOT NULL CONSTRAINT DF_TeamStorePurchases_M DEFAULT (0),
       PurchasedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamStorePurchases_PurchasedAt DEFAULT (SYSUTCDATETIME()),
-      CONSTRAINT FK_TeamStorePurchases_Teams FOREIGN KEY (TeamId) REFERENCES dbo.Teams(Id) ON DELETE CASCADE,
-      CONSTRAINT FK_TeamStorePurchases_Parts FOREIGN KEY (PartId) REFERENCES dbo.Parts(Id),
+      CONSTRAINT FK_TeamStorePurchases_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
+      CONSTRAINT FK_TeamStorePurchases_Parts FOREIGN KEY (PartId) REFERENCES dbo.PART(Id),
       CONSTRAINT CK_TeamStorePurchases_Qty CHECK (Qty > 0),
       CONSTRAINT CK_TeamStorePurchases_Cost CHECK (UnitCost >= 0 AND TotalCost >= 0),
       CONSTRAINT CK_TeamStorePurchases_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
@@ -48,28 +48,28 @@ BEGIN TRY
   END
 END TRY
 BEGIN CATCH
-  DECLARE @msgA NVARCHAR(4000) = N'No se pudo crear dbo.TeamStorePurchases. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
+  DECLARE @msgA NVARCHAR(4000) = N'No se pudo crear dbo.TEAM_STORE_PURCHASE. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
   RAISERROR(@msgA, 16, 1);
   RETURN;
 END CATCH
 
-IF OBJECT_ID('dbo.TeamStorePurchases', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_STORE_PURCHASE', 'U') IS NOT NULL
 BEGIN
   BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamStorePurchases') AND name = 'IX_TeamStorePurchases_TeamId')
-       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamStorePurchases') AND name = 'IX_TeamStorePurchases_TeamId')
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_TeamId')
+       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_TeamId')
     BEGIN
-      CREATE INDEX IX_TeamStorePurchases_TeamId ON dbo.TeamStorePurchases(TeamId);
+      CREATE INDEX IX_TeamStorePurchases_TeamId ON dbo.TEAM_STORE_PURCHASE(TeamId);
     END
 
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TeamStorePurchases') AND name = 'IX_TeamStorePurchases_PartId')
-       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TeamStorePurchases') AND name = 'IX_TeamStorePurchases_PartId')
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_PartId')
+       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_PartId')
     BEGIN
-      CREATE INDEX IX_TeamStorePurchases_PartId ON dbo.TeamStorePurchases(PartId);
+      CREATE INDEX IX_TeamStorePurchases_PartId ON dbo.TEAM_STORE_PURCHASE(PartId);
     END
   END TRY
   BEGIN CATCH
-    DECLARE @msgAI NVARCHAR(4000) = N'No se pudieron crear índices de dbo.TeamStorePurchases. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
+    DECLARE @msgAI NVARCHAR(4000) = N'No se pudieron crear índices de dbo.TEAM_STORE_PURCHASE. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
     RAISERROR(@msgAI, 16, 1);
     RETURN;
   END CATCH
@@ -96,7 +96,7 @@ BEGIN TRY
       RETURN;
     END
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Teams WHERE Id = @TeamId)
+    IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
     BEGIN
       RAISERROR(''Equipo no encontrado.'', 16, 1);
       RETURN;
@@ -121,7 +121,7 @@ BEGIN TRY
       @P = p.P,
       @A = p.A,
       @M = p.M
-    FROM dbo.Parts p WITH (UPDLOCK, ROWLOCK)
+    FROM dbo.PART p WITH (UPDLOCK, ROWLOCK)
     WHERE p.Id = @PartId;
 
     IF @PartName IS NULL
@@ -145,7 +145,7 @@ BEGIN TRY
     SELECT
       @BudgetTotal = b.Total,
       @BudgetSpent = b.Spent
-    FROM dbo.TeamBudgets b WITH (UPDLOCK, ROWLOCK)
+    FROM dbo.TEAM_BUDGET b WITH (UPDLOCK, ROWLOCK)
     WHERE b.TeamId = @TeamId;
 
     IF @BudgetTotal IS NULL
@@ -165,20 +165,20 @@ BEGIN TRY
     END
 
     -- Decrement stock
-    UPDATE dbo.Parts
+    UPDATE dbo.PART
     SET Stock = Stock - @Qty,
         UpdatedAt = SYSUTCDATETIME()
     WHERE Id = @PartId;
 
     -- Increment spent
-    UPDATE dbo.TeamBudgets
+    UPDATE dbo.TEAM_BUDGET
     SET Spent = Spent + @TotalCost
     WHERE TeamId = @TeamId;
 
     -- Upsert inventory item (by TeamId+PartId unique index from 003)
-    IF EXISTS (SELECT 1 FROM dbo.TeamInventoryItems WHERE TeamId = @TeamId AND PartId = @PartId)
+    IF EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM WHERE TeamId = @TeamId AND PartId = @PartId)
     BEGIN
-      UPDATE dbo.TeamInventoryItems
+      UPDATE dbo.TEAM_INVENTORY_ITEM
       SET Qty = Qty + @Qty,
           UnitCost = @UnitCost,
           PartName = @PartName,
@@ -191,15 +191,15 @@ BEGIN TRY
     END
     ELSE
     BEGIN
-      INSERT INTO dbo.TeamInventoryItems (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, CreatedAt, AcquiredAt)
+      INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, CreatedAt, AcquiredAt)
       VALUES (NEWID(), @TeamId, @PartId, @PartName, @Category, @P, @A, @M, @Qty, @UnitCost, SYSUTCDATETIME(), SYSUTCDATETIME());
     END
 
     -- Audit movement
-    INSERT INTO dbo.TeamStorePurchases (Id, TeamId, PartId, PartName, Category, Qty, UnitCost, TotalCost, P, A, M, PurchasedAt)
+    INSERT INTO dbo.TEAM_STORE_PURCHASE (Id, TeamId, PartId, PartName, Category, Qty, UnitCost, TotalCost, P, A, M, PurchasedAt)
     VALUES (NEWID(), @TeamId, @PartId, @PartName, @Category, @Qty, @UnitCost, @TotalCost, @P, @A, @M, SYSUTCDATETIME());
 
-    UPDATE dbo.Teams SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+    UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 
     COMMIT TRAN;
 
@@ -216,5 +216,5 @@ END CATCH
 
 -- Quick verification
 SELECT DB_NAME() AS CurrentDatabase,
-       OBJECT_ID(N'dbo.TeamStorePurchases') AS PurchasesObjectId,
+  OBJECT_ID(N'dbo.TEAM_STORE_PURCHASE') AS PurchasesObjectId,
        OBJECT_ID(N'dbo.Store_PurchasePart') AS PurchaseSpObjectId;

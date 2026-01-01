@@ -56,7 +56,7 @@ export class SqlServerUserRepository extends UserRepository {
     const result = await pool
       .request()
       .query(
-        "SELECT Id, Name, Email, PasswordHash, Role, CreatedAt FROM dbo.Users ORDER BY CreatedAt DESC;"
+        "SELECT Id, Name, Email, PasswordHash, Role, CreatedAt FROM dbo.[USER] ORDER BY CreatedAt DESC;"
       );
 
     return (result.recordset || []).map(mapUserRow);

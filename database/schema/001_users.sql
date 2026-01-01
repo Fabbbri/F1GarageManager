@@ -6,9 +6,9 @@
 SET NOCOUNT ON;
 GO
 
-IF OBJECT_ID('dbo.Users', 'U') IS NULL
+IF OBJECT_ID('dbo.[USER]', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.Users (
+  CREATE TABLE dbo.[USER] (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
     Name NVARCHAR(120) NOT NULL,
     Email NVARCHAR(320) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
@@ -17,10 +17,10 @@ BEGIN
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT (SYSUTCDATETIME())
   );
 
-  ALTER TABLE dbo.Users
+  ALTER TABLE dbo.[USER]
     ADD CONSTRAINT CK_Users_Role CHECK (Role IN ('ADMIN','ENGINEER','DRIVER'));
 
-  CREATE UNIQUE INDEX UX_Users_Email ON dbo.Users(Email);
+  CREATE UNIQUE INDEX UX_Users_Email ON dbo.[USER](Email);
 END
 GO
 
@@ -40,7 +40,7 @@ BEGIN
     PasswordHash,
     Role,
     CreatedAt
-  FROM dbo.Users
+  FROM dbo.[USER]
   WHERE Email = @Email;
 END
 GO
@@ -60,7 +60,7 @@ BEGIN
     PasswordHash,
     Role,
     CreatedAt
-  FROM dbo.Users
+  FROM dbo.[USER]
   WHERE Id = @Id;
 END
 GO
@@ -77,12 +77,12 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  IF EXISTS (SELECT 1 FROM dbo.Users WHERE Email = @Email)
+  IF EXISTS (SELECT 1 FROM dbo.[USER] WHERE Email = @Email)
   BEGIN
     ;THROW 50001, 'Ese correo ya está registrado.', 1;
   END
 
-  INSERT INTO dbo.Users (Id, Name, Email, PasswordHash, Role)
+  INSERT INTO dbo.[USER] (Id, Name, Email, PasswordHash, Role)
   VALUES (@Id, @Name, @Email, @PasswordHash, @Role);
 
   EXEC dbo.User_GetById @Id = @Id;
