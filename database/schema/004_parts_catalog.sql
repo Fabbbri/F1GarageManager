@@ -1,5 +1,3 @@
--- Parts catalog (Store)
--- This script is idempotent.
 
 SET NOCOUNT ON;
 
@@ -12,9 +10,9 @@ BEGIN
 END
 
 BEGIN TRY
-  IF OBJECT_ID('dbo.PART', 'U') IS NULL
+  IF OBJECT_ID('dbo.STORE', 'U') IS NULL
   BEGIN
-    CREATE TABLE dbo.PART (
+    CREATE TABLE dbo.STORE (
       Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_Parts PRIMARY KEY,
       Name NVARCHAR(160) NOT NULL,
       Category NVARCHAR(120) NOT NULL,
@@ -31,36 +29,33 @@ BEGIN TRY
   END
 END TRY
 BEGIN CATCH
-  DECLARE @msg1 NVARCHAR(4000) = N'No se pudo crear dbo.PART. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
+  DECLARE @msg1 NVARCHAR(4000) = N'No se pudo crear dbo.STORE. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
   RAISERROR(@msg1, 16, 1);
   RETURN;
 END CATCH
 
-IF OBJECT_ID('dbo.PART', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.STORE', 'U') IS NOT NULL
 BEGIN
   BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.PART') AND name = 'IX_Parts_Category')
-       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.PART') AND name = 'IX_Parts_Category')
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.STORE') AND name = 'IX_Parts_Category')
+       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.STORE') AND name = 'IX_Parts_Category')
     BEGIN
-      CREATE INDEX IX_Parts_Category ON dbo.PART(Category);
+      CREATE INDEX IX_Parts_Category ON dbo.STORE(Category);
     END
 
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.PART') AND name = 'UX_Parts_Name')
-       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.PART') AND name = 'UX_Parts_Name')
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.STORE') AND name = 'UX_Parts_Name')
+       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.STORE') AND name = 'UX_Parts_Name')
     BEGIN
-      CREATE UNIQUE INDEX UX_Parts_Name ON dbo.PART(Name);
+      CREATE UNIQUE INDEX UX_Parts_Name ON dbo.STORE(Name);
     END
   END TRY
   BEGIN CATCH
-    DECLARE @msg2 NVARCHAR(4000) = N'No se pudieron crear índices de dbo.PART. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
+    DECLARE @msg2 NVARCHAR(4000) = N'No se pudieron crear índices de dbo.STORE. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
     RAISERROR(@msg2, 16, 1);
     RETURN;
   END CATCH
 END
 
---------------------------------------------------------------------------------
--- Seed default catalog (idempotent)
---------------------------------------------------------------------------------
 DECLARE @p1 UNIQUEIDENTIFIER = '11111111-1111-1111-1111-111111111111';
 DECLARE @p2 UNIQUEIDENTIFIER = '22222222-2222-2222-2222-222222222222';
 DECLARE @p3 UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
@@ -68,62 +63,57 @@ DECLARE @p4 UNIQUEIDENTIFIER = '44444444-4444-4444-4444-444444444444';
 DECLARE @p5 UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
 
 BEGIN TRY
-  IF NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @p1)
+  IF NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE Id = @p1)
   BEGIN
-    INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M)
+    INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M)
     VALUES (@p1, N'Paquete aerodinámico estándar', N'Paquete aerodinámico', 12000, 8, 1, 4, 2);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @p2)
+  IF NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE Id = @p2)
   BEGIN
-    INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M)
+    INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M)
     VALUES (@p2, N'Juego de neumáticos (medium)', N'Neumáticos', 9000, 20, 2, 2, 3);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @p3)
+  IF NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE Id = @p3)
   BEGIN
-    INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M)
+    INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M)
     VALUES (@p3, N'Unidad de potencia V6 híbrida', N'Power Unit', 25000, 6, 6, 0, 1);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @p4)
+  IF NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE Id = @p4)
   BEGIN
-    INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M)
+    INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M)
     VALUES (@p4, N'Suspensión reforzada', N'Suspensión', 14000, 10, 0, 1, 5);
   END
 
-  IF NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @p5)
+  IF NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE Id = @p5)
   BEGIN
-    INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M)
+    INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M)
     VALUES (@p5, N'Caja de cambios 8 velocidades', N'Caja de cambios', 16000, 7, 2, 1, 2);
   END
 END TRY
 BEGIN CATCH
-  DECLARE @msg3 NVARCHAR(4000) = N'No se pudo insertar el catálogo inicial en dbo.PART. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
+  DECLARE @msg3 NVARCHAR(4000) = N'No se pudo insertar el catálogo inicial en dbo.STORE. Corré este script con un usuario admin/db_owner (no f1app). Error: ' + ERROR_MESSAGE();
   RAISERROR(@msg3, 16, 1);
   RETURN;
 END CATCH
 
---------------------------------------------------------------------------------
--- Stored Procedures
---------------------------------------------------------------------------------
 DECLARE @sql NVARCHAR(MAX);
 
 BEGIN TRY
 
--- Part_List
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Part_List
 AS
 BEGIN
   SET NOCOUNT ON;
 
   SELECT Id, Name, Category, Price, Stock, P, A, M, CreatedAt, UpdatedAt
-  FROM dbo.PART
+  FROM dbo.STORE
   ORDER BY CreatedAt DESC;
 END';
 EXEC sys.sp_executesql @sql;
 
--- Part_GetById
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Part_GetById
   @Id UNIQUEIDENTIFIER
 AS
@@ -131,12 +121,11 @@ BEGIN
   SET NOCOUNT ON;
 
   SELECT TOP (1) Id, Name, Category, Price, Stock, P, A, M, CreatedAt, UpdatedAt
-  FROM dbo.PART
+  FROM dbo.STORE
   WHERE Id = @Id;
 END';
 EXEC sys.sp_executesql @sql;
 
--- Part_Create
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Part_Create
   @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(160),
@@ -151,14 +140,13 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  INSERT INTO dbo.PART (Id, Name, Category, Price, Stock, P, A, M, CreatedAt, UpdatedAt)
+  INSERT INTO dbo.STORE (Id, Name, Category, Price, Stock, P, A, M, CreatedAt, UpdatedAt)
   VALUES (@Id, @Name, @Category, @Price, @Stock, @P, @A, @M, SYSUTCDATETIME(), SYSUTCDATETIME());
 
   EXEC dbo.Part_GetById @Id = @Id;
 END';
 EXEC sys.sp_executesql @sql;
 
--- Part_DecrementStock
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Part_DecrementStock
   @Id UNIQUEIDENTIFIER,
   @Qty INT
@@ -175,7 +163,7 @@ BEGIN
 
   BEGIN TRAN;
 
-  UPDATE dbo.PART
+  UPDATE dbo.STORE
   SET Stock = Stock - @Qty,
       UpdatedAt = SYSUTCDATETIME()
   WHERE Id = @Id AND Stock >= @Qty;
@@ -193,7 +181,6 @@ BEGIN
 END';
 EXEC sys.sp_executesql @sql;
 
--- Part_IncrementStock
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Part_IncrementStock
   @Id UNIQUEIDENTIFIER,
   @Qty INT
@@ -208,7 +195,7 @@ BEGIN
     RETURN;
   END
 
-  UPDATE dbo.PART
+  UPDATE dbo.STORE
   SET Stock = Stock + @Qty,
       UpdatedAt = SYSUTCDATETIME()
   WHERE Id = @Id;
@@ -229,6 +216,5 @@ BEGIN CATCH
   RETURN;
 END CATCH
 
--- Quick verification
-SELECT DB_NAME() AS CurrentDatabase, OBJECT_ID(N'dbo.PART') AS PartsObjectId, COUNT(1) AS PartsCount
-FROM dbo.PART;
+SELECT DB_NAME() AS CurrentDatabase, OBJECT_ID(N'dbo.STORE') AS PartsObjectId, COUNT(1) AS PartsCount
+FROM dbo.STORE;

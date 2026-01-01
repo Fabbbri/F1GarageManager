@@ -22,11 +22,17 @@ BEGIN
   EXEC sys.sp_rename @objname = N'dbo.Users', @newname = N'USER', @objtype = N'OBJECT';
 END
 
--- Parts -> PART
+-- Parts/PART -> STORE
 IF OBJECT_ID(N'dbo.Parts', 'U') IS NOT NULL
-   AND OBJECT_ID(N'dbo.PART', 'U') IS NULL
+   AND OBJECT_ID(N'dbo.STORE', 'U') IS NULL
 BEGIN
-  EXEC sys.sp_rename @objname = N'dbo.Parts', @newname = N'PART', @objtype = N'OBJECT';
+  EXEC sys.sp_rename @objname = N'dbo.Parts', @newname = N'STORE', @objtype = N'OBJECT';
+END
+
+IF OBJECT_ID(N'dbo.PART', 'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.STORE', 'U') IS NULL
+BEGIN
+  EXEC sys.sp_rename @objname = N'dbo.PART', @newname = N'STORE', @objtype = N'OBJECT';
 END
 
 -- Teams -> TEAM

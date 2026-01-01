@@ -13,9 +13,9 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.PART', 'U') IS NULL
+IF OBJECT_ID('dbo.STORE', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
+  RAISERROR('No existe dbo.STORE. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
   RETURN;
 END
 
@@ -53,8 +53,8 @@ END
 
 --------------------------------------------------------------------------------
 -- 1) Reconciliar PartId de inventario viejo
---    - Si PartId es NULL o no existe en dbo.Parts
---    - Mapea por PartName (único en dbo.Parts)
+--    - Si PartId es NULL o no existe en dbo.STORE
+--    - Mapea por PartName (único en dbo.STORE)
 --------------------------------------------------------------------------------
 ;WITH Candidates AS (
   SELECT
@@ -67,10 +67,10 @@ END
     p.A AS NewA,
     p.M AS NewM
   FROM dbo.TEAM_INVENTORY_ITEM ii
-  JOIN dbo.PART p
+  JOIN dbo.STORE p
     ON p.Name = ii.PartName
   WHERE ii.PartId IS NULL
-     OR NOT EXISTS (SELECT 1 FROM dbo.PART px WHERE px.Id = ii.PartId)
+    OR NOT EXISTS (SELECT 1 FROM dbo.STORE px WHERE px.Id = ii.PartId)
 )
 UPDATE ii
 SET
@@ -153,7 +153,7 @@ BEGIN
   FROM dbo.TEAM_INVENTORY_ITEM keep
   JOIN #DupGroups g
     ON keep.Id = g.KeepId
-  JOIN dbo.PART p
+  JOIN dbo.STORE p
     ON p.Id = keep.PartId;
 
   -- Delete redundant rows

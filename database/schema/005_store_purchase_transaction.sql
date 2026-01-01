@@ -14,9 +14,9 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.PART', 'U') IS NULL
+IF OBJECT_ID('dbo.STORE', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
+  RAISERROR('No existe dbo.STORE. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
   RETURN;
 END
 
@@ -40,7 +40,7 @@ BEGIN TRY
       M INT NOT NULL CONSTRAINT DF_TeamStorePurchases_M DEFAULT (0),
       PurchasedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamStorePurchases_PurchasedAt DEFAULT (SYSUTCDATETIME()),
       CONSTRAINT FK_TeamStorePurchases_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
-      CONSTRAINT FK_TeamStorePurchases_Parts FOREIGN KEY (PartId) REFERENCES dbo.PART(Id),
+      CONSTRAINT FK_TeamStorePurchases_Parts FOREIGN KEY (PartId) REFERENCES dbo.STORE(Id),
       CONSTRAINT CK_TeamStorePurchases_Qty CHECK (Qty > 0),
       CONSTRAINT CK_TeamStorePurchases_Cost CHECK (UnitCost >= 0 AND TotalCost >= 0),
       CONSTRAINT CK_TeamStorePurchases_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
@@ -121,7 +121,7 @@ BEGIN TRY
       @P = p.P,
       @A = p.A,
       @M = p.M
-    FROM dbo.PART p WITH (UPDLOCK, ROWLOCK)
+    FROM dbo.STORE p WITH (UPDLOCK, ROWLOCK)
     WHERE p.Id = @PartId;
 
     IF @PartName IS NULL
@@ -165,7 +165,7 @@ BEGIN TRY
     END
 
     -- Decrement stock
-    UPDATE dbo.PART
+    UPDATE dbo.STORE
     SET Stock = Stock - @Qty,
         UpdatedAt = SYSUTCDATETIME()
     WHERE Id = @PartId;
