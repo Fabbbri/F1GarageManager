@@ -22,17 +22,21 @@ BEGIN
   EXEC sys.sp_rename @objname = N'dbo.Users', @newname = N'USER', @objtype = N'OBJECT';
 END
 
--- Parts/PART -> STORE
+-- Parts (legacy) -> PART (catálogo)
 IF OBJECT_ID(N'dbo.Parts', 'U') IS NOT NULL
-   AND OBJECT_ID(N'dbo.STORE', 'U') IS NULL
+   AND OBJECT_ID(N'dbo.PART', 'U') IS NULL
 BEGIN
-  EXEC sys.sp_rename @objname = N'dbo.Parts', @newname = N'STORE', @objtype = N'OBJECT';
+  EXEC sys.sp_rename @objname = N'dbo.Parts', @newname = N'PART', @objtype = N'OBJECT';
 END
 
-IF OBJECT_ID(N'dbo.PART', 'U') IS NOT NULL
-   AND OBJECT_ID(N'dbo.STORE', 'U') IS NULL
+-- Si existe un dbo.STORE legacy (catálogo viejo) y no existe PART, renombrarlo.
+-- Nota: el nuevo diseño también usa dbo.STORE, pero con columnas (PartId/Price/Stock).
+IF OBJECT_ID(N'dbo.STORE', 'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.PART', 'U') IS NULL
+   AND COL_LENGTH(N'dbo.STORE', N'Name') IS NOT NULL
+   AND COL_LENGTH(N'dbo.STORE', N'PartId') IS NULL
 BEGIN
-  EXEC sys.sp_rename @objname = N'dbo.PART', @newname = N'STORE', @objtype = N'OBJECT';
+  EXEC sys.sp_rename @objname = N'dbo.STORE', @newname = N'PART', @objtype = N'OBJECT';
 END
 
 -- Teams -> TEAM

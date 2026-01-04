@@ -13,9 +13,9 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.STORE', 'U') IS NULL
+IF OBJECT_ID('dbo.PART', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.STORE. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
+  RAISERROR('No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql.', 16, 1);
   RETURN;
 END
 
@@ -51,41 +51,31 @@ BEGIN
   END CATCH
 END
 
---------------------------------------------------------------------------------
--- 1) Reconciliar PartId de inventario viejo
---    - Si PartId es NULL o no existe en dbo.STORE
---    - Mapea por PartName (único en dbo.STORE)
---------------------------------------------------------------------------------
-;WITH Candidates AS (
-  SELECT
-    ii.Id AS InventoryItemId,
-    p.Id AS NewPartId,
-    p.Name AS NewPartName,
-    p.Category AS NewCategory,
-    p.Price AS NewPrice,
-    p.P AS NewP,
-    p.A AS NewA,
-    p.M AS NewM
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartName') IS NOT NULL
+BEGIN
+  ;WITH Candidates AS (
+    SELECT
+      ii.Id AS InventoryItemId,
+      p.Id AS NewPartId,
+      COALESCE(s.Price, p.BasePrice, 0) AS NewPrice
+    FROM dbo.TEAM_INVENTORY_ITEM ii
+    JOIN dbo.PART p
+      ON p.Name = ii.PartName
+    LEFT JOIN dbo.STORE s
+      ON s.PartId = p.Id
+    WHERE ii.PartId IS NULL
+      OR NOT EXISTS (SELECT 1 FROM dbo.PART px WHERE px.Id = ii.PartId)
+  )
+  UPDATE ii
+  SET
+    PartId = c.NewPartId,
+    UnitCost = CASE
+      WHEN ii.UnitCost IS NULL OR ii.UnitCost = 0 THEN c.NewPrice
+      ELSE ii.UnitCost
+    END
   FROM dbo.TEAM_INVENTORY_ITEM ii
-  JOIN dbo.STORE p
-    ON p.Name = ii.PartName
-  WHERE ii.PartId IS NULL
-    OR NOT EXISTS (SELECT 1 FROM dbo.STORE px WHERE px.Id = ii.PartId)
-)
-UPDATE ii
-SET
-  PartId = c.NewPartId,
-  PartName = c.NewPartName,
-  Category = c.NewCategory,
-  P = c.NewP,
-  A = c.NewA,
-  M = c.NewM,
-  UnitCost = CASE
-    WHEN ii.UnitCost IS NULL OR ii.UnitCost = 0 THEN c.NewPrice
-    ELSE ii.UnitCost
-  END
-FROM dbo.TEAM_INVENTORY_ITEM ii
-JOIN Candidates c ON c.InventoryItemId = ii.Id;
+  JOIN Candidates c ON c.InventoryItemId = ii.Id;
+END
 
 --------------------------------------------------------------------------------
 -- 2) Unificar duplicados por (TeamId, PartId)
@@ -144,17 +134,10 @@ BEGIN
   SET
     Qty = g.SumQty,
     UnitCost = g.MaxUnitCost,
-    AcquiredAt = g.MaxAcquiredAt,
-    PartName = p.Name,
-    Category = p.Category,
-    P = p.P,
-    A = p.A,
-    M = p.M
+    AcquiredAt = g.MaxAcquiredAt
   FROM dbo.TEAM_INVENTORY_ITEM keep
   JOIN #DupGroups g
-    ON keep.Id = g.KeepId
-  JOIN dbo.STORE p
-    ON p.Id = keep.PartId;
+    ON keep.Id = g.KeepId;
 
   -- Delete redundant rows
   DELETE ii

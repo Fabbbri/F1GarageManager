@@ -43,6 +43,58 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 
 ---
 
+## ✅ Simulación rápida (para probar que todo sirve)
+
+Objetivo: verificar que el flujo sigue igual con la BD normalizada (`PART` + `STORE`) y que funcionan compras → inventario → instalación.
+
+### A) Levantar backend + frontend
+1. Backend (carpeta `backend`):
+	- `npm install`
+	- `npm run dev` (ojo: es `dev`, no `deve`)
+2. Verificar BD desde el backend:
+	- Abrí `http://localhost:4000/health/db` y confirmá que responde `ok: true`.
+3. Frontend (carpeta `frontend`):
+	- `npm install`
+	- `npm start`
+
+### B) Probar en la página (flujo completo)
+1. Signup/Login.
+2. Crear un Team (Teams → Create / Add):
+	- Confirmá que se ve el presupuesto y que el team abre su detalle.
+3. Ir a Store:
+	- Deben aparecer partes con `Price` y `Stock`.
+4. Comprar una parte (por ejemplo Qty=1):
+	- Debe bajar el stock en Store.
+	- Debe aumentar el inventario del Team (misma parte, Qty sube).
+	- Debe aumentar “BudgetSpent” (o bajar el presupuesto disponible).
+5. Instalar la parte en un Car:
+	- La parte debe aparecer en “Installed parts”.
+	- El inventario debe reflejar el cambio (según la lógica de la app).
+
+### C) Verificación directa en SQL (opcional, en SSMS)
+Corré estas consultas para confirmar que los datos quedaron consistentes:
+```sql
+SELECT TOP (20) Id, Name, Category, P, A, M, BasePrice, CreatedAt, UpdatedAt
+FROM dbo.PART
+ORDER BY CreatedAt DESC;
+
+SELECT TOP (20) Id, PartId, Price, Stock, CreatedAt, UpdatedAt
+FROM dbo.STORE
+ORDER BY CreatedAt DESC;
+
+SELECT TOP (20) Id, TeamId, PartId, Qty, UnitCost, CreatedAt, AcquiredAt
+FROM dbo.TEAM_INVENTORY_ITEM
+ORDER BY CreatedAt DESC;
+
+SELECT TOP (20) Id, TeamId, StoreId, PartId, Qty, UnitCost, TotalCost, PurchasedAt
+FROM dbo.TEAM_STORE_PURCHASE
+ORDER BY PurchasedAt DESC;
+```
+
+Si algo falla en la UI, lo más útil es pegar el error del backend (consola donde corre `npm run dev`) y el endpoint que estabas usando.
+
+---
+
 ## 🗄️ SQL Server (guardar usuarios en BD)
 
 > Esto es **solo** para persistir usuarios (email + passwordHash) desde el login/signup.
@@ -64,12 +116,12 @@ Antes de ejecutar el proyecto, asegurarse de tener instalado:
 5. Ejecutar el script de catálogo de tienda (Parts):
 	- Abrí el archivo `database/schema/004_parts_catalog.sql`.
 	- Seleccioná la BD `F1GarageManager`.
-	- Ejecutá (F5). Esto crea la tabla `dbo.Parts` y stored procedures `dbo.Part_*`.
+	- Ejecutá (F5). Esto crea/ajusta `dbo.PART` (catálogo) + `dbo.STORE` (listing) y los stored procedures `dbo.Part_*`.
 
 6. Ejecutar el script de compra transaccional (auditoría + atomicidad):
 	- Abrí el archivo `database/schema/005_store_purchase_transaction.sql`.
 	- Seleccioná la BD `F1GarageManager`.
-	- Ejecutá (F5). Esto crea `dbo.TeamStorePurchases` y el SP `dbo.Store_PurchasePart`.
+	- Ejecutá (F5). Esto crea/ajusta `dbo.TEAM_STORE_PURCHASE` y el SP `dbo.Store_PurchasePart`.
 
 > Nota: usamos la versión **nogo** porque evita `GO` y `THROW`, que en algunos entornos/ejecutores causan errores de sintaxis.
 
@@ -214,3 +266,17 @@ DB_TRUST_SERVER_CERTIFICATE=true
 ### E) Verificar
 1. En `backend`: `npm install` y `npm run dev`.
 2. Abrir: `http://localhost:4000/health/db` (debe salir `enabled: true`).
+
+---
+
+## ✅ Si ya tenés la base de datos creada
+
+Si la BD `F1GarageManager` **ya existe** y solo querés actualizarla a la versión actual del esquema (STORE + PART normalizado), corré los scripts en este orden (en SSMS, apuntando a `F1GarageManager`):
+
+1. `database/schema/001_users.sql` (solo si querés login/signup en BD; si ya lo tenés, lo podés omitir)
+2. `database/schema/003_teams_relational_nogo.sql` (teams + inventario + SPs `dbo.Team_*`)
+3. `database/schema/004_parts_catalog.sql` (crea/ajusta `dbo.PART` + `dbo.STORE` y SPs `dbo.Part_*`)
+4. `database/schema/005_store_purchase_transaction.sql` (crea/ajusta `dbo.TEAM_STORE_PURCHASE` y `dbo.Store_PurchasePart`)
+
+Opcional (solo si venís de una versión vieja y tenés inventario repetido/duplicado):
+- `database/schema/006_fix_inventory_stacking.sql` (corrélo **una sola vez**)

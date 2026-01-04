@@ -14,9 +14,9 @@ BEGIN
   RETURN;
 END
 
-IF OBJECT_ID('dbo.STORE', 'U') IS NULL
+IF OBJECT_ID('dbo.STORE', 'U') IS NULL OR OBJECT_ID('dbo.PART', 'U') IS NULL
 BEGIN
-  RAISERROR('No existe dbo.STORE. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
+  RAISERROR('No existe dbo.STORE o dbo.PART. Corré primero database/schema/004_parts_catalog.sql en esta misma base.', 16, 1);
   RETURN;
 END
 
@@ -29,21 +29,17 @@ BEGIN TRY
     CREATE TABLE dbo.TEAM_STORE_PURCHASE (
       Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamStorePurchases PRIMARY KEY,
       TeamId UNIQUEIDENTIFIER NOT NULL,
+      StoreId UNIQUEIDENTIFIER NOT NULL,
       PartId UNIQUEIDENTIFIER NOT NULL,
-      PartName NVARCHAR(160) NOT NULL,
-      Category NVARCHAR(120) NOT NULL,
       Qty INT NOT NULL,
       UnitCost DECIMAL(18,2) NOT NULL,
       TotalCost DECIMAL(18,2) NOT NULL,
-      P INT NOT NULL CONSTRAINT DF_TeamStorePurchases_P DEFAULT (0),
-      A INT NOT NULL CONSTRAINT DF_TeamStorePurchases_A DEFAULT (0),
-      M INT NOT NULL CONSTRAINT DF_TeamStorePurchases_M DEFAULT (0),
       PurchasedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamStorePurchases_PurchasedAt DEFAULT (SYSUTCDATETIME()),
       CONSTRAINT FK_TeamStorePurchases_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
-      CONSTRAINT FK_TeamStorePurchases_Parts FOREIGN KEY (PartId) REFERENCES dbo.STORE(Id),
+      CONSTRAINT FK_TeamStorePurchases_Store FOREIGN KEY (StoreId) REFERENCES dbo.STORE(Id),
+      CONSTRAINT FK_TeamStorePurchases_Part FOREIGN KEY (PartId) REFERENCES dbo.PART(Id),
       CONSTRAINT CK_TeamStorePurchases_Qty CHECK (Qty > 0),
-      CONSTRAINT CK_TeamStorePurchases_Cost CHECK (UnitCost >= 0 AND TotalCost >= 0),
-      CONSTRAINT CK_TeamStorePurchases_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
+      CONSTRAINT CK_TeamStorePurchases_Cost CHECK (UnitCost >= 0 AND TotalCost >= 0)
     );
   END
 END TRY
@@ -55,6 +51,75 @@ END CATCH
 
 IF OBJECT_ID('dbo.TEAM_STORE_PURCHASE', 'U') IS NOT NULL
 BEGIN
+  -- Upgrade existing table to new UML shape
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'StoreId') IS NULL
+  BEGIN
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE ADD StoreId UNIQUEIDENTIFIER NULL;
+
+    -- Backfill StoreId using PartId (dynamic to avoid batch compile errors)
+    DECLARE @sqlBackfillStoreId NVARCHAR(MAX) = N'
+      UPDATE p
+      SET StoreId = s.Id
+      FROM dbo.TEAM_STORE_PURCHASE p
+      JOIN dbo.STORE s ON s.PartId = p.PartId
+      WHERE p.StoreId IS NULL;
+
+      -- Make it NOT NULL if fully backfilled
+      IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_STORE_PURCHASE WHERE StoreId IS NULL)
+      BEGIN
+        ALTER TABLE dbo.TEAM_STORE_PURCHASE ALTER COLUMN StoreId UNIQUEIDENTIFIER NOT NULL;
+      END';
+    EXEC sys.sp_executesql @sqlBackfillStoreId;
+  END
+
+  -- Drop legacy columns if they exist
+  IF OBJECT_ID('dbo.DF_TeamStorePurchases_P', 'D') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP CONSTRAINT DF_TeamStorePurchases_P;
+  IF OBJECT_ID('dbo.DF_TeamStorePurchases_A', 'D') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP CONSTRAINT DF_TeamStorePurchases_A;
+  IF OBJECT_ID('dbo.DF_TeamStorePurchases_M', 'D') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP CONSTRAINT DF_TeamStorePurchases_M;
+  IF OBJECT_ID('dbo.CK_TeamStorePurchases_PAM', 'C') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP CONSTRAINT CK_TeamStorePurchases_PAM;
+
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'PartName') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP COLUMN PartName;
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'Category') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP COLUMN Category;
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'P') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP COLUMN P;
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'A') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP COLUMN A;
+  IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'M') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP COLUMN M;
+
+  -- Fix FKs to match new shape
+  IF OBJECT_ID('dbo.FK_TeamStorePurchases_Parts', 'F') IS NOT NULL
+    ALTER TABLE dbo.TEAM_STORE_PURCHASE DROP CONSTRAINT FK_TeamStorePurchases_Parts;
+
+  IF OBJECT_ID('dbo.FK_TeamStorePurchases_Store', 'F') IS NULL
+  BEGIN
+    BEGIN TRY
+      IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'StoreId') IS NOT NULL
+      BEGIN
+        EXEC sys.sp_executesql N'ALTER TABLE dbo.TEAM_STORE_PURCHASE
+          ADD CONSTRAINT FK_TeamStorePurchases_Store FOREIGN KEY (StoreId) REFERENCES dbo.STORE(Id);';
+      END
+    END TRY
+    BEGIN CATCH
+    END CATCH
+  END
+
+  IF OBJECT_ID('dbo.FK_TeamStorePurchases_Part', 'F') IS NULL
+  BEGIN
+    BEGIN TRY
+      ALTER TABLE dbo.TEAM_STORE_PURCHASE
+        ADD CONSTRAINT FK_TeamStorePurchases_Part FOREIGN KEY (PartId) REFERENCES dbo.PART(Id);
+    END TRY
+    BEGIN CATCH
+    END CATCH
+  END
+
   BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_TeamId')
        AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_TeamId')
@@ -66,6 +131,15 @@ BEGIN
        AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_PartId')
     BEGIN
       CREATE INDEX IX_TeamStorePurchases_PartId ON dbo.TEAM_STORE_PURCHASE(PartId);
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_StoreId')
+       AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_STORE_PURCHASE') AND name = 'IX_TeamStorePurchases_StoreId')
+    BEGIN
+      IF COL_LENGTH('dbo.TEAM_STORE_PURCHASE', 'StoreId') IS NOT NULL
+      BEGIN
+        EXEC sys.sp_executesql N'CREATE INDEX IX_TeamStorePurchases_StoreId ON dbo.TEAM_STORE_PURCHASE(StoreId);';
+      END
     END
   END TRY
   BEGIN CATCH
@@ -102,29 +176,24 @@ BEGIN TRY
       RETURN;
     END
 
-    DECLARE @PartName NVARCHAR(160);
-    DECLARE @Category NVARCHAR(120);
+    DECLARE @StoreId UNIQUEIDENTIFIER;
     DECLARE @UnitCost DECIMAL(18,2);
     DECLARE @Stock INT;
-    DECLARE @P INT;
-    DECLARE @A INT;
-    DECLARE @M INT;
+    DECLARE @Category NVARCHAR(120);
 
     BEGIN TRAN;
 
-    -- Lock the part row for update
+    -- Lock the store row for update (by PartId)
     SELECT
-      @PartName = p.Name,
-      @Category = p.Category,
-      @UnitCost = p.Price,
-      @Stock = p.Stock,
-      @P = p.P,
-      @A = p.A,
-      @M = p.M
-    FROM dbo.STORE p WITH (UPDLOCK, ROWLOCK)
-    WHERE p.Id = @PartId;
+      @StoreId = s.Id,
+      @UnitCost = s.Price,
+      @Stock = s.Stock,
+      @Category = p.Category
+    FROM dbo.STORE s WITH (UPDLOCK, ROWLOCK)
+    JOIN dbo.PART p ON p.Id = s.PartId
+    WHERE s.PartId = @PartId;
 
-    IF @PartName IS NULL
+    IF @StoreId IS NULL
     BEGIN
       ROLLBACK TRAN;
       RAISERROR(''Parte no encontrada.'', 16, 1);
@@ -167,8 +236,8 @@ BEGIN TRY
     -- Decrement stock
     UPDATE dbo.STORE
     SET Stock = Stock - @Qty,
-        UpdatedAt = SYSUTCDATETIME()
-    WHERE Id = @PartId;
+      UpdatedAt = SYSUTCDATETIME()
+    WHERE PartId = @PartId;
 
     -- Increment spent
     UPDATE dbo.TEAM_BUDGET
@@ -181,23 +250,18 @@ BEGIN TRY
       UPDATE dbo.TEAM_INVENTORY_ITEM
       SET Qty = Qty + @Qty,
           UnitCost = @UnitCost,
-          PartName = @PartName,
-          Category = @Category,
-          P = @P,
-          A = @A,
-          M = @M,
           AcquiredAt = SYSUTCDATETIME()
       WHERE TeamId = @TeamId AND PartId = @PartId;
     END
     ELSE
     BEGIN
-      INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, CreatedAt, AcquiredAt)
-      VALUES (NEWID(), @TeamId, @PartId, @PartName, @Category, @P, @A, @M, @Qty, @UnitCost, SYSUTCDATETIME(), SYSUTCDATETIME());
+      INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, Qty, UnitCost, CreatedAt, AcquiredAt)
+      VALUES (NEWID(), @TeamId, @PartId, @Qty, @UnitCost, SYSUTCDATETIME(), SYSUTCDATETIME());
     END
 
     -- Audit movement
-    INSERT INTO dbo.TEAM_STORE_PURCHASE (Id, TeamId, PartId, PartName, Category, Qty, UnitCost, TotalCost, P, A, M, PurchasedAt)
-    VALUES (NEWID(), @TeamId, @PartId, @PartName, @Category, @Qty, @UnitCost, @TotalCost, @P, @A, @M, SYSUTCDATETIME());
+    INSERT INTO dbo.TEAM_STORE_PURCHASE (Id, TeamId, StoreId, PartId, Qty, UnitCost, TotalCost, PurchasedAt)
+    VALUES (NEWID(), @TeamId, @StoreId, @PartId, @Qty, @UnitCost, @TotalCost, SYSUTCDATETIME());
 
     UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
 

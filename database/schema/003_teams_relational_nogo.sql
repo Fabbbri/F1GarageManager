@@ -168,19 +168,13 @@ BEGIN
   CREATE TABLE dbo.TEAM_INVENTORY_ITEM (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamInventoryItems PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
-    PartId UNIQUEIDENTIFIER NULL,
-    PartName NVARCHAR(160) NOT NULL,
-    Category NVARCHAR(120) NULL,
-    P INT NOT NULL CONSTRAINT DF_TeamInventoryItems_P DEFAULT (0),
-    A INT NOT NULL CONSTRAINT DF_TeamInventoryItems_A DEFAULT (0),
-    M INT NOT NULL CONSTRAINT DF_TeamInventoryItems_M DEFAULT (0),
+    PartId UNIQUEIDENTIFIER NOT NULL,
     Qty INT NOT NULL CONSTRAINT DF_TeamInventoryItems_Qty DEFAULT (0),
     UnitCost DECIMAL(18,2) NOT NULL CONSTRAINT DF_TeamInventoryItems_UnitCost DEFAULT (0),
     CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_CreatedAt DEFAULT (SYSUTCDATETIME()),
     AcquiredAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamInventoryItems_AcquiredAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT FK_TeamInventoryItems_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
-    CONSTRAINT CK_TeamInventoryItems_NonNegative CHECK (Qty >= 0 AND UnitCost >= 0),
-    CONSTRAINT CK_TeamInventoryItems_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
+    CONSTRAINT CK_TeamInventoryItems_NonNegative CHECK (Qty >= 0 AND UnitCost >= 0)
   );
 END
 
@@ -206,17 +200,56 @@ BEGIN
   END CATCH
 END
 
-IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'P') IS NULL
+-- Upgrade helper: si existen columnas legacy PartName/Category, intentar mapear PartId
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartId') IS NOT NULL
+   AND COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartName') IS NOT NULL
 BEGIN
-  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD P INT NOT NULL CONSTRAINT DF_TeamInventoryItems_P DEFAULT (0);
+  DECLARE @mapSql NVARCHAR(MAX) = N'';
+  IF OBJECT_ID('dbo.PART', 'U') IS NOT NULL
+  BEGIN
+    SET @mapSql = N'UPDATE ii SET PartId = p.Id FROM dbo.TEAM_INVENTORY_ITEM ii JOIN dbo.PART p ON p.Name = ii.PartName WHERE ii.PartId IS NULL;';
+  END
+  ELSE IF OBJECT_ID('dbo.STORE', 'U') IS NOT NULL AND COL_LENGTH('dbo.STORE', 'Name') IS NOT NULL
+  BEGIN
+    -- Compat con DB viejo donde STORE era catálogo
+    SET @mapSql = N'UPDATE ii SET PartId = s.Id FROM dbo.TEAM_INVENTORY_ITEM ii JOIN dbo.STORE s ON s.Name = ii.PartName WHERE ii.PartId IS NULL;';
+  END
+
+  IF @mapSql <> N''
+    EXEC sys.sp_executesql @mapSql;
 END
-IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'A') IS NULL
+
+-- Drop columnas legacy del inventario para alinearse al UML
+IF OBJECT_ID('dbo.DF_TeamInventoryItems_P', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP CONSTRAINT DF_TeamInventoryItems_P;
+IF OBJECT_ID('dbo.DF_TeamInventoryItems_A', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP CONSTRAINT DF_TeamInventoryItems_A;
+IF OBJECT_ID('dbo.DF_TeamInventoryItems_M', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP CONSTRAINT DF_TeamInventoryItems_M;
+IF OBJECT_ID('dbo.CK_TeamInventoryItems_PAM', 'C') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP CONSTRAINT CK_TeamInventoryItems_PAM;
+
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartName') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP COLUMN PartName;
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'Category') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP COLUMN Category;
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'P') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP COLUMN P;
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'A') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP COLUMN A;
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'M') IS NOT NULL
+  ALTER TABLE dbo.TEAM_INVENTORY_ITEM DROP COLUMN M;
+
+-- Hacer PartId NOT NULL si ya no hay NULLs
+IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'PartId') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM)
+   AND NOT EXISTS (SELECT 1 FROM dbo.TEAM_INVENTORY_ITEM WHERE PartId IS NULL)
 BEGIN
-  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD A INT NOT NULL CONSTRAINT DF_TeamInventoryItems_A DEFAULT (0);
-END
-IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'M') IS NULL
-BEGIN
-  ALTER TABLE dbo.TEAM_INVENTORY_ITEM ADD M INT NOT NULL CONSTRAINT DF_TeamInventoryItems_M DEFAULT (0);
+  BEGIN TRY
+    ALTER TABLE dbo.TEAM_INVENTORY_ITEM ALTER COLUMN PartId UNIQUEIDENTIFIER NOT NULL;
+  END TRY
+  BEGIN CATCH
+  END CATCH
 END
 
 -- Si por permisos/ejecución parcial las columnas no quedaron creadas, salir con un mensaje claro
@@ -231,11 +264,7 @@ BEGIN
   RETURN;
 END
 
-IF COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'P') IS NULL OR COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'A') IS NULL OR COL_LENGTH('dbo.TEAM_INVENTORY_ITEM', 'M') IS NULL
-BEGIN
-  RAISERROR('Faltan columnas P/A/M en dbo.TEAM_INVENTORY_ITEM. Corré este script con un usuario admin/db_owner para aplicar el upgrade.', 16, 1);
-  RETURN;
-END
+-- Nota: en el modelo UML normalizado, P/A/M viven en dbo.PART (no en TEAM_INVENTORY_ITEM).
 
 IF OBJECT_ID('dbo.TEAM_INVENTORY_ITEM', 'U') IS NOT NULL
 BEGIN
@@ -266,31 +295,33 @@ BEGIN
     CarId UNIQUEIDENTIFIER NOT NULL,
     InventoryItemId UNIQUEIDENTIFIER NOT NULL,
     CategoryKey NVARCHAR(160) NOT NULL,
-    PartName NVARCHAR(160) NOT NULL,
-    Category NVARCHAR(120) NULL,
-    P INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_P DEFAULT (0),
-    A INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_A DEFAULT (0),
-    M INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_M DEFAULT (0),
     InstalledAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamCarInstalledParts_InstalledAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT FK_TeamCarInstalledParts_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
     CONSTRAINT FK_TeamCarInstalledParts_Cars FOREIGN KEY (CarId) REFERENCES dbo.TEAM_CAR(Id),
     CONSTRAINT FK_TeamCarInstalledParts_Inventory FOREIGN KEY (InventoryItemId) REFERENCES dbo.TEAM_INVENTORY_ITEM(Id),
-    CONSTRAINT CK_TeamCarInstalledParts_PAM CHECK (P BETWEEN 0 AND 9 AND A BETWEEN 0 AND 9 AND M BETWEEN 0 AND 9)
+    CONSTRAINT CK_TeamCarInstalledParts_CategoryKey CHECK (LEN(LTRIM(RTRIM(CategoryKey))) > 0)
   );
 END
 
-IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'P') IS NULL
-BEGIN
-  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD P INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_P DEFAULT (0);
-END
-IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'A') IS NULL
-BEGIN
-  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD A INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_A DEFAULT (0);
-END
-IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'M') IS NULL
-BEGIN
-  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART ADD M INT NOT NULL CONSTRAINT DF_TeamCarInstalledParts_M DEFAULT (0);
-END
+-- Drop columnas legacy de instalado
+IF OBJECT_ID('dbo.DF_TeamCarInstalledParts_P', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP CONSTRAINT DF_TeamCarInstalledParts_P;
+IF OBJECT_ID('dbo.DF_TeamCarInstalledParts_A', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP CONSTRAINT DF_TeamCarInstalledParts_A;
+IF OBJECT_ID('dbo.DF_TeamCarInstalledParts_M', 'D') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP CONSTRAINT DF_TeamCarInstalledParts_M;
+IF OBJECT_ID('dbo.CK_TeamCarInstalledParts_PAM', 'C') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP CONSTRAINT CK_TeamCarInstalledParts_PAM;
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'PartName') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP COLUMN PartName;
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'Category') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP COLUMN Category;
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'P') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP COLUMN P;
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'A') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP COLUMN A;
+IF COL_LENGTH('dbo.TEAM_CAR_INSTALLED_PART', 'M') IS NOT NULL
+  ALTER TABLE dbo.TEAM_CAR_INSTALLED_PART DROP COLUMN M;
 
 IF OBJECT_ID('dbo.TEAM_CAR_INSTALLED_PART', 'U') IS NOT NULL
 BEGIN
@@ -346,29 +377,55 @@ BEGIN
   WHERE t.Id = @Id;
 
   SELECT Id, TeamId, Name, Contribution, Description, CreatedAt
-  FROM dbo.TEAM_SPONSOR
-  WHERE TeamId = @Id
-  ORDER BY CreatedAt DESC;
+  FROM dbo.TEAM_SPONSOR s
+  WHERE s.TeamId = @Id
+  ORDER BY s.CreatedAt DESC;
 
-  SELECT Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, CreatedAt, AcquiredAt
-  FROM dbo.TEAM_INVENTORY_ITEM
-  WHERE TeamId = @Id
-  ORDER BY CreatedAt DESC;
+  SELECT
+    ii.Id,
+    ii.TeamId,
+    ii.PartId,
+    p.Name AS PartName,
+    p.Category AS Category,
+    p.P,
+    p.A,
+    p.M,
+    ii.Qty,
+    ii.UnitCost,
+    ii.CreatedAt,
+    ii.AcquiredAt
+  FROM dbo.TEAM_INVENTORY_ITEM ii
+  LEFT JOIN dbo.PART p ON p.Id = ii.PartId
+  WHERE ii.TeamId = @Id
+  ORDER BY ii.CreatedAt DESC;
 
   SELECT Id, TeamId, Code, Name, DriverId, IsFinalized
-  FROM dbo.TEAM_CAR
-  WHERE TeamId = @Id
-  ORDER BY CreatedAt DESC;
+  FROM dbo.TEAM_CAR c
+  WHERE c.TeamId = @Id
+  ORDER BY c.CreatedAt DESC;
 
-  SELECT Id, TeamId, CarId, InventoryItemId, CategoryKey, PartName, Category, P, A, M, InstalledAt
-  FROM dbo.TEAM_CAR_INSTALLED_PART
-  WHERE TeamId = @Id
-  ORDER BY InstalledAt DESC;
+  SELECT
+    ip.Id,
+    ip.TeamId,
+    ip.CarId,
+    ip.InventoryItemId,
+    ip.CategoryKey,
+    p.Name AS PartName,
+    p.Category AS Category,
+    p.P,
+    p.A,
+    p.M,
+    ip.InstalledAt
+  FROM dbo.TEAM_CAR_INSTALLED_PART ip
+  LEFT JOIN dbo.TEAM_INVENTORY_ITEM ii ON ii.Id = ip.InventoryItemId
+  LEFT JOIN dbo.PART p ON p.Id = ii.PartId
+  WHERE ip.TeamId = @Id
+  ORDER BY ip.InstalledAt DESC;
 
   SELECT Id, TeamId, Name, Skill
-  FROM dbo.TEAM_DRIVER
-  WHERE TeamId = @Id
-  ORDER BY CreatedAt DESC;
+  FROM dbo.TEAM_DRIVER d
+  WHERE d.TeamId = @Id
+  ORDER BY d.CreatedAt DESC;
 END';
 EXEC sys.sp_executesql @sql;
 
@@ -662,29 +719,23 @@ BEGIN
     RAISERROR(''PartId requerido.'', 16, 1);
     RETURN;
   END
-  IF @PartName IS NULL OR LTRIM(RTRIM(@PartName)) = ''''
-  BEGIN
-    RAISERROR(''Nombre de parte requerido.'', 16, 1);
-    RETURN;
-  END
-  IF NULLIF(LTRIM(RTRIM(@Category)), '''') IS NULL
-  BEGIN
-    RAISERROR(''Categoría requerida.'', 16, 1);
-    RETURN;
-  END
-  IF @Category NOT IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'')
-  BEGIN
-    RAISERROR(''Categoría inválida: debe ser una de las 5 categorías obligatorias.'', 16, 1);
-    RETURN;
-  END
-  IF @P < 0 OR @P > 9 OR @A < 0 OR @A > 9 OR @M < 0 OR @M > 9
-  BEGIN
-    RAISERROR(''Rendimiento inválido: P/A/M deben ser enteros 0-9.'', 16, 1);
-    RETURN;
-  END
   IF @Qty <= 0 OR @UnitCost < 0
   BEGIN
     RAISERROR(''Valores de compra inválidos.'', 16, 1);
+    RETURN;
+  END
+
+  IF OBJECT_ID(''dbo.PART'', ''U'') IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.PART WHERE Id = @PartId)
+  BEGIN
+    RAISERROR(''Parte no encontrada.'', 16, 1);
+    RETURN;
+  END
+
+  DECLARE @RealCategory NVARCHAR(120);
+  SELECT @RealCategory = Category FROM dbo.PART WHERE Id = @PartId;
+  IF @RealCategory NOT IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'')
+  BEGIN
+    RAISERROR(''Categoría inválida: debe ser una de las 5 categorías obligatorias.'', 16, 1);
     RETURN;
   END
 
@@ -728,17 +779,13 @@ BEGIN
     SET
       Qty = Qty + @Qty,
       UnitCost = @UnitCost,
-      Category = @Category,
-      P = @P,
-      A = @A,
-      M = @M,
       AcquiredAt = SYSUTCDATETIME()
     WHERE TeamId = @TeamId AND PartId = @PartId;
   END
   ELSE
   BEGIN
-    INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, PartName, Category, P, A, M, Qty, UnitCost, AcquiredAt)
-    VALUES (NEWID(), @TeamId, @PartId, LTRIM(RTRIM(@PartName)), @Category, @P, @A, @M, @Qty, @UnitCost, SYSUTCDATETIME());
+    INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, Qty, UnitCost, CreatedAt, AcquiredAt)
+    VALUES (NEWID(), @TeamId, @PartId, @Qty, @UnitCost, SYSUTCDATETIME(), SYSUTCDATETIME());
   END
 
   UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
@@ -780,22 +827,19 @@ BEGIN
     RETURN;
   END
 
-  DECLARE @PartName NVARCHAR(160);
+  DECLARE @PartId UNIQUEIDENTIFIER;
   DECLARE @Category NVARCHAR(120);
   DECLARE @CategoryKey NVARCHAR(160);
-  DECLARE @P INT;
-  DECLARE @A INT;
-  DECLARE @M INT;
 
-  SELECT
-    @PartName = PartName,
-    @Category = Category,
-    @CategoryKey = LTRIM(RTRIM(Category)),
-    @P = P,
-    @A = A,
-    @M = M
+  SELECT @PartId = PartId
   FROM dbo.TEAM_INVENTORY_ITEM
   WHERE TeamId = @TeamId AND Id = @InventoryItemId;
+
+  SELECT
+    @Category = p.Category,
+    @CategoryKey = LTRIM(RTRIM(p.Category))
+  FROM dbo.PART p
+  WHERE p.Id = @PartId;
 
   IF @CategoryKey NOT IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'')
   BEGIN
@@ -834,8 +878,8 @@ BEGIN
     RETURN;
   END
 
-  INSERT INTO dbo.TEAM_CAR_INSTALLED_PART (Id, TeamId, CarId, InventoryItemId, CategoryKey, PartName, Category, P, A, M)
-  VALUES (NEWID(), @TeamId, @CarId, @InventoryItemId, @CategoryKey, @PartName, @Category, @P, @A, @M);
+  INSERT INTO dbo.TEAM_CAR_INSTALLED_PART (Id, TeamId, CarId, InventoryItemId, CategoryKey, InstalledAt)
+  VALUES (NEWID(), @TeamId, @CarId, @InventoryItemId, @CategoryKey, SYSUTCDATETIME());
 
   UPDATE dbo.TEAM_CAR SET IsFinalized = 0 WHERE TeamId = @TeamId AND Id = @CarId;
 
@@ -1105,20 +1149,55 @@ BEGIN
     RAISERROR(''Nombre de parte requerido.'', 16, 1);
     RETURN;
   END
+  IF NULLIF(LTRIM(RTRIM(@Category)), '''') IS NULL
+  BEGIN
+    RAISERROR(''Categoría requerida.'', 16, 1);
+    RETURN;
+  END
+  SET @Category = LTRIM(RTRIM(@Category));
+  IF @Category NOT IN (''Power Unit'', ''Paquete aerodinámico'', ''Neumáticos'', ''Suspensión'', ''Caja de cambios'')
+  BEGIN
+    RAISERROR(''Categoría inválida: debe ser una de las 5 categorías obligatorias.'', 16, 1);
+    RETURN;
+  END
   IF @Qty < 0 OR @UnitCost < 0
   BEGIN
     RAISERROR(''Valores de inventario inválidos.'', 16, 1);
     RETURN;
   END
 
-  INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartName, Category, Qty, UnitCost, AcquiredAt)
+  IF OBJECT_ID(''dbo.PART'', ''U'') IS NULL
+  BEGIN
+    RAISERROR(''No existe dbo.PART. Corré primero database/schema/004_parts_catalog.sql.'', 16, 1);
+    RETURN;
+  END
+
+  DECLARE @PartId UNIQUEIDENTIFIER;
+  SELECT @PartId = Id FROM dbo.PART WHERE Name = LTRIM(RTRIM(@PartName));
+
+  IF @PartId IS NULL
+  BEGIN
+    SET @PartId = NEWID();
+    INSERT INTO dbo.PART (Id, Name, Category, P, A, M, BasePrice, CreatedAt, UpdatedAt)
+    VALUES (@PartId, LTRIM(RTRIM(@PartName)), @Category, 0, 0, 0, @UnitCost, SYSUTCDATETIME(), SYSUTCDATETIME());
+  END
+
+  -- Asegurar listing en STORE (para futuras compras)
+  IF OBJECT_ID(''dbo.STORE'', ''U'') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM dbo.STORE WHERE PartId = @PartId)
+  BEGIN
+    INSERT INTO dbo.STORE (Id, PartId, Price, Stock, CreatedAt, UpdatedAt)
+    VALUES (NEWID(), @PartId, @UnitCost, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+  END
+
+  INSERT INTO dbo.TEAM_INVENTORY_ITEM (Id, TeamId, PartId, Qty, UnitCost, CreatedAt, AcquiredAt)
   VALUES (
     @ItemId,
     @TeamId,
-    LTRIM(RTRIM(@PartName)),
-    NULLIF(LTRIM(RTRIM(@Category)), ''''),
+    @PartId,
     @Qty,
     @UnitCost,
+    SYSUTCDATETIME(),
     SYSUTCDATETIME()
   );
 
