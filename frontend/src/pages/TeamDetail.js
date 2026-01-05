@@ -208,14 +208,14 @@ export default function TeamDetail() {
         {tab === 1 && (
           <Section title="Patrocinadores">
             <Stack spacing={2}>
-              <Box component="form" onSubmit={onAddSponsor}>
+              {/*<Box component="form" onSubmit={onAddSponsor}>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField label="Nombre" value={sName} onChange={(e) => setSName(e.target.value)} fullWidth />
                   <TextField label="Contribución" value={sContrib} onChange={(e) => setSContrib(e.target.value)} fullWidth />
                   <TextField label="Descripción" value={sDesc} onChange={(e) => setSDesc(e.target.value)} fullWidth />
                   <Button type="submit" variant="contained" disabled={!canEdit}>Agregar</Button>
                 </Stack>
-              </Box>
+              </Box>*/}
 
               <Divider />
 
@@ -227,7 +227,7 @@ export default function TeamDetail() {
                     <Card key={s.id} variant="outlined">
                       <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                         <Box sx={{ flex: 1 }}>
-                          <Typography fontWeight={800}>{s.name}</Typography>
+                          <Typography fontWeight={800} color="text.primary">{String(s.name)}</Typography>
                           <Typography variant="body2" color="text.secondary">Contribución: {Number(s.contribution || 0)}</Typography>
                           {s.createdAt ? (
                             <Typography variant="body2" color="text.secondary">
@@ -238,9 +238,9 @@ export default function TeamDetail() {
                             <Typography variant="body2" color="text.secondary">Descripción: {s.description}</Typography>
                           ) : null}
                         </Box>
-                        <Button disabled={!canEdit} onClick={async () => setTeam(await deleteSponsor(id, s.id))}>
+                        {/*<Button disabled={!canEdit} onClick={async () => setTeam(await deleteSponsor(id, s.id))}>
                           Eliminar
-                        </Button>
+                        </Button>*/}
                       </CardContent>
                     </Card>
                   ))}

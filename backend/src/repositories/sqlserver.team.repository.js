@@ -16,8 +16,9 @@ function mapTeamFromRecordsets(recordsets) {
   if (!teamRow) return null;
 
   const sponsors = (recordsets?.[1] || []).map((r) => ({
-    id: String(r.Id),
-    name: r.Name,
+    id: String(r.Id),                 // GUID del earning
+    sponsorId: Number(r.SponsorId),   // INT real del sponsor
+    name: r.SponsorName,              // viene del JOIN
     contribution: Number(r.Contribution ?? 0),
     description: r.Description ?? "",
     createdAt: iso(r.CreatedAt),
@@ -97,9 +98,9 @@ function mapTeamFromRecordsets(recordsets) {
     },
     sponsors,
     contributions: sponsors.map((s) => ({
-      id: s.id,
-      sponsorId: s.id,
-      sponsorName: s.name,
+      id: s.id,                       // GUID del earning
+      sponsorId: s.sponsorId,         // ✅ INT
+      sponsorName: s.name,            // ✅ nombre real
       date: s.createdAt,
       amount: Number(s.contribution ?? 0),
       description: s.description ?? "",
