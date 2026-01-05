@@ -10,6 +10,10 @@ import { AuthService } from "../services/auth.service.js";
 import { makeAuthController } from "../controllers/auth.controller.js";
 import { makeAuthRoutes } from "./auth.routes.js";
 
+import { UserService } from "../services/user.service.js";
+import { makeUserController } from "../controllers/user.controller.js";
+import { makeUserRoutes } from "./users.routes.js";
+
 import { InMemoryTeamRepository } from "../repositories/inmemory.team.repository.js";
 import { SqlServerTeamRepository } from "../repositories/sqlserver.team.repository.js";
 import { TeamService } from "../services/team.service.js";
@@ -37,6 +41,11 @@ const userRepo =
 const authService = new AuthService(userRepo);
 const authController = makeAuthController(authService);
 router.use("/auth", makeAuthRoutes(authController));
+
+// USERS
+const userService = new UserService(userRepo);
+const userController = makeUserController(userService);
+router.use("/users", makeUserRoutes(userController));
 
 // PARTS (store catalog)
 const seedParts = [

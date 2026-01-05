@@ -2,7 +2,9 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 export function makeTeamController(teamService) {
   return {
-    list: asyncHandler(async (req, res) => res.json({ teams: await teamService.list() })),
+    list: asyncHandler(async (req, res) =>
+      res.json({ teams: await teamService.list(req.auth) })
+    ),
     getById: asyncHandler(async (req, res) => res.json({ team: await teamService.getById(req.params.id) })),
     create: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.create(req.body) })),
     update: asyncHandler(async (req, res) => res.json({ team: await teamService.update(req.params.id, req.body) })),
@@ -36,8 +38,14 @@ export function makeTeamController(teamService) {
     finalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.finalizeCar(req.params.id, { carId: req.params.carId }) })),
     unfinalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.unfinalizeCar(req.params.id, { carId: req.params.carId }) })),
     addEarning: asyncHandler(async (req, res) =>
-  res.status(201).json({ team: await teamService.addEarning(req.params.id, req.body) })
-),
+      res.status(201).json({ team: await teamService.addEarning(req.params.id, req.body) })
+    ),
+    assignEngineer: asyncHandler(async (req, res) =>
+      res.status(201).json({
+        team: await teamService.assignEngineer(req.params.id, req.body.userId),
+      })
+    ),
+
   };
   
 }

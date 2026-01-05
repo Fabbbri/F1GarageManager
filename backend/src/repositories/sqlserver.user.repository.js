@@ -61,4 +61,25 @@ export class SqlServerUserRepository extends UserRepository {
 
     return (result.recordset || []).map(mapUserRow);
   }
+
+  async list({ role } = {}) {
+    const pool = await getSqlPool();
+    const req = pool.request();
+
+    let query = `SELECT Id, Name, Email, Role FROM dbo.[USER]`;
+    if (role) {
+      query += ` WHERE Role = @Role`;
+      req.input("Role", sql.NVarChar(20), role);
+    }
+    query += ` ORDER BY Name ASC`;
+
+    const r = await req.query(query);
+    return r.recordset.map(u => ({
+      id: String(u.Id),
+      name: u.Name,
+      email: u.Email,
+      role: u.Role,
+    }));
+  }
 }
+

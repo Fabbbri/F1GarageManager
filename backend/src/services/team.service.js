@@ -34,8 +34,14 @@ export class TeamService {
     });
   }
 
-  async list() {
-    return this.teamRepo.list();
+  async list(auth) {
+    if (!auth?.userId) throw this._err(401, "No autenticado.");
+
+    if (typeof this.teamRepo.listVisibleByUser === "function") {
+      return await this.teamRepo.listVisibleByUser(auth.userId);
+    }
+    // fallback para repos en memoria
+    return await this.teamRepo.list();
   }
 
   async getById(id) {
@@ -440,6 +446,10 @@ export class TeamService {
     const updated = await this.teamRepo.unfinalizeCar(teamId, { carId: String(carId) });
     if (!updated) throw this._err(404, "Equipo o carro no encontrado.");
     return updated;
+  }
+
+  async assignEngineer(teamId, userId) {
+    return await this.teamRepo.assignEngineer(teamId, userId); // ejecuta SP
   }
 
   

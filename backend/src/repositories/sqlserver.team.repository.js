@@ -515,6 +515,31 @@ export class SqlServerTeamRepository extends TeamRepository {
 
   return result.recordset ?? { ok: true };
 }
+
+async listVisibleByUser(userId) {
+  const pool = await getSqlPool();
+  const r = await pool.request()
+    .input("UserId", sql.UniqueIdentifier, userId)
+    .execute("dbo.Team_ListVisibleByUser");
+  return (r.recordset || []).map(mapTeamFromListRow).filter(Boolean);
+}
+
+async assignEngineer(teamId, userId) {
+  const pool = await getSqlPool();
+
+  // 1) Ejecuta el SP que asigna
+  await pool.request()
+    .input("TeamId", sql.UniqueIdentifier, teamId)
+    .input("UserId", sql.UniqueIdentifier, userId)
+    .execute("dbo.Team_AssignEngineer");
+
+  // 2) Devuelve el team completo (re-usa tu SP Team_GetById)
+  const result = await pool.request()
+    .input("Id", sql.UniqueIdentifier, teamId)
+    .execute("dbo.Team_GetById");
+
+  return mapTeamFromRecordsets(result.recordsets);
+}
 }
 
 

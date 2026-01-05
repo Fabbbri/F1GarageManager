@@ -13,7 +13,8 @@ async function handle(res) {
 }
 
 export async function listTeams() {
-  return (await handle(await fetch(`${API_URL}/teams`, { headers: headers() }))).teams;
+  const res = await handle(await fetch(`${API_URL}/teams`, { headers: headers() }));
+  return res.teams || [];
 }
 
 export async function createTeam(payload) {
@@ -109,3 +110,18 @@ export async function deleteTeam(id) {
   if (!res.ok) throw new Error(data.error || "Error eliminando equipo");
   return true;
 }
+
+export async function assignEngineer(teamId, userId) {
+  return await handle(
+    await fetch(`${API_URL}/teams/${teamId}/engineer`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ userId }),
+    })
+  );
+}
+
+export async function listEngineers() {
+  return await handle(await fetch(`${API_URL}/users?role=ENGINEER`, { headers: headers() }));
+}
+

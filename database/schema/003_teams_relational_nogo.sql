@@ -162,6 +162,25 @@ BEGIN
   END
 END
 
+IF OBJECT_ID('dbo.TEAM_ENGINEER', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.TEAM_ENGINEER (
+    TeamId UNIQUEIDENTIFIER NOT NULL,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    AssignedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamEngineer_AssignedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT PK_TeamEngineer PRIMARY KEY (UserId), 
+    CONSTRAINT FK_TeamEngineer_Team FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamEngineer_User FOREIGN KEY (UserId) REFERENCES dbo.[USER](Id) ON DELETE CASCADE
+  );
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_ENGINEER') AND name = 'IX_TeamEngineer_TeamId')
+BEGIN
+  CREATE INDEX IX_TeamEngineer_TeamId ON dbo.TEAM_ENGINEER(TeamId);
+END
+
+
+
 -- Inventory
 IF OBJECT_ID('dbo.TEAM_INVENTORY_ITEM', 'U') IS NULL
 BEGIN
@@ -927,6 +946,94 @@ BEGIN
   COMMIT TRAN;
 
   EXEC dbo.Team_GetById @Id = @TeamId;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_AssignEngineer
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AssignEngineer
+  @TeamId UNIQUEIDENTIFIER,
+  @UserId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
+  BEGIN RAISERROR(''Equipo no encontrado.'', 16, 1); RETURN; END
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.[USER] WHERE Id = @UserId)
+  BEGIN RAISERROR(''Usuario no encontrado.'', 16, 1); RETURN; END
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.[USER] WHERE Id = @UserId AND Role = ''ENGINEER'')
+  BEGIN RAISERROR(''El usuario no es ENGINEER.'', 16, 1); RETURN; END
+
+  IF EXISTS (SELECT 1 FROM dbo.TEAM_ENGINEER WHERE UserId = @UserId)
+    UPDATE dbo.TEAM_ENGINEER
+      SET TeamId = @TeamId, AssignedAt = SYSUTCDATETIME()
+    WHERE UserId = @UserId;
+  ELSE
+    INSERT INTO dbo.TEAM_ENGINEER(TeamId, UserId) VALUES (@TeamId, @UserId);
+
+  EXEC dbo.Team_GetById @Id = @TeamId;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_RemoveEngineer
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveEngineer
+  @UserId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  DELETE FROM dbo.TEAM_ENGINEER WHERE UserId = @UserId;
+  IF @@ROWCOUNT = 0
+  BEGIN RAISERROR(''El engineer no tenía asignación.'', 16, 1); RETURN; END
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_ListVisibleByUser
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_ListVisibleByUser
+  @UserId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  DECLARE @Role NVARCHAR(20);
+  SELECT @Role = Role FROM dbo.[USER] WHERE Id = @UserId;
+
+  IF @Role IS NULL
+  BEGIN RAISERROR(''Usuario no encontrado.'', 16, 1); RETURN; END
+
+  IF @Role = ''ADMIN''
+  BEGIN
+    SELECT
+      t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+      b.Total AS BudgetTotal,
+      b.Spent AS BudgetSpent
+    FROM dbo.TEAM t
+    LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
+    ORDER BY t.CreatedAt DESC;
+    RETURN;
+  END
+
+  IF @Role = ''ENGINEER''
+  BEGIN
+    SELECT
+      t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+      b.Total AS BudgetTotal,
+      b.Spent AS BudgetSpent
+    FROM dbo.TEAM_ENGINEER te
+    JOIN dbo.TEAM t ON t.Id = te.TeamId
+    LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
+    WHERE te.UserId = @UserId;
+    RETURN;
+  END
+
+  -- otros roles: sin equipos
+  SELECT TOP (0)
+    t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+    CAST(0 AS DECIMAL(18,2)) AS BudgetTotal,
+    CAST(0 AS DECIMAL(18,2)) AS BudgetSpent
+  FROM dbo.TEAM t;
 END';
 EXEC sys.sp_executesql @sql;
 

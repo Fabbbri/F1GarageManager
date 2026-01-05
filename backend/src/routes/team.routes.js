@@ -44,6 +44,7 @@ export function makeTeamRoutes(teamController) {
   r.delete("/:id/inventory/:itemId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeInventoryItem);
 
   r.post("/:id/earnings", requireAuth, requireRole("ADMIN"), teamController.addContribution);
+  r.post("/:id/engineer", requireAuth, requireRole("ADMIN"), teamController.assignEngineer);
 
   return r;
 }
