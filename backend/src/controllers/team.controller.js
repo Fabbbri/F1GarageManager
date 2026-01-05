@@ -35,5 +35,9 @@ export function makeTeamController(teamService) {
     assignCarDriver: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.assignCarDriver(req.params.id, { carId: req.params.carId, ...req.body }) })),
     finalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.finalizeCar(req.params.id, { carId: req.params.carId }) })),
     unfinalizeCar: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.unfinalizeCar(req.params.id, { carId: req.params.carId }) })),
+    addEarning: asyncHandler(async (req, res) =>
+  res.status(201).json({ team: await teamService.addEarning(req.params.id, req.body) })
+),
   };
+  
 }

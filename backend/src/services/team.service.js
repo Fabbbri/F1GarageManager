@@ -1,3 +1,13 @@
+function normalizeContribution(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error("Contribución inválida");
+  }
+  return n;
+}
+
+
+
 export class TeamService {
   constructor(teamRepo, partRepo = null) {
     this.teamRepo = teamRepo;
@@ -12,6 +22,16 @@ export class TeamService {
       "Suspensión",
       "Caja de cambios",
     ];
+  }
+
+  async addEarning({ teamId, sponsorId, contribution, description }) {
+    const normalized = normalizeContribution(contribution);
+    return await this.teamRepository.addEarning({
+      teamId,
+      sponsorId,
+      contribution: normalized,
+      description,
+    });
   }
 
   async list() {
@@ -98,32 +118,34 @@ export class TeamService {
     return updated;
   }
 
-  // -------- Contributions (Budget source) ----------
   async addContribution(teamId, { sponsorId, date, amount, description }) {
-    const team = await this.getById(teamId);
+    // valida team exista (ok)
+    await this.getById(teamId);
 
-    if (!sponsorId) throw this._err(400, "sponsorId requerido.");
-    const sponsor = (team.sponsors || []).find(s => s.id === String(sponsorId));
-    if (!sponsor) throw this._err(400, "Patrocinador inválido.");
+    // sponsorId debe ser int > 0
+    console.log("RAW sponsorId:", sponsorId, "type:", typeof sponsorId);
+    const sid = Number.parseInt(String(sponsorId), 10);
+    console.log("PARSED sid:", sid, "isInteger:", Number.isInteger(sid));
+    if (!Number.isInteger(sid) || sid <= 0) throw this._err(400, "Patrocinador inválido.");
 
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) throw this._err(400, "Monto inválido.");
+    // monto entero >= 0 (o > 0 si preferís)
+    const numericAmount = Number.parseInt(String(amount), 10);
+    if (!Number.isInteger(numericAmount) || numericAmount < 0) throw this._err(400, "Monto inválido.");
 
-    const d = new Date(date);
-    if (!date || Number.isNaN(d.getTime())) throw this._err(400, "Fecha inválida.");
+    // fecha opcional (tu SP usa CreatedAt default, así que realmente no hace falta)
+    // si querés validarla igual:
+    if (date) {
+      const d = new Date(date);
+      if (Number.isNaN(d.getTime())) throw this._err(400, "Fecha inválida.");
+    }
 
-    const contribution = {
-      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
-      sponsorId: sponsor.id,
-      sponsorName: sponsor.name,
-      date: d.toISOString(),
-      amount: numericAmount,
-      description: (description || "").trim(),
-    };
-
-    const updated = await this.teamRepo.addContribution(teamId, contribution);
-    if (!updated) throw this._err(404, "Equipo no encontrado.");
-    return updated;
+    // ✅ aquí es donde se “conecta” con SQL Server
+    // (Tu SP Team_AddEarning ya toma el nombre desde dbo.SPONSOR y usa CreatedAt default)
+    return await this.teamRepo.addEarning(teamId, {
+      sponsorId: sid,
+      contribution: numericAmount,
+      description: (description || "").trim() || null,
+    });
   }
 
   // -------- Drivers ----------
@@ -420,9 +442,12 @@ export class TeamService {
     return updated;
   }
 
+  
+
   _err(status, message) {
     const e = new Error(message);
     e.status = status;
     return e;
   }
 }
+

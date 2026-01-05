@@ -22,6 +22,11 @@ import { PartService } from "../services/part.service.js";
 import { makePartController } from "../controllers/part.controller.js";
 import { makePartRoutes } from "./part.routes.js";
 
+import { makeSponsorRoutes } from "./sponsor.routes.js";
+import { SponsorController } from "../controllers/sponsor.controller.js";
+import { SponsorService } from "../services/sponsor.service.js";
+import { SqlServerSponsorRepository } from "../repositories/sqlserver.sponsor.repository.js";
+
 const router = Router();
 
 // AUTH
@@ -32,27 +37,6 @@ const userRepo =
 const authService = new AuthService(userRepo);
 const authController = makeAuthController(authService);
 router.use("/auth", makeAuthRoutes(authController));
-
-// TEAMS
-const seedTeams = [
-  {
-    id: "t1",
-    name: "Red Comet Racing",
-    country: "Costa Rica",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    budget: { total: 0, spent: 0 },
-    sponsors: [],
-    contributions: [],
-    inventory: [],
-    cars: [],
-    drivers: [],
-  }
-];
-const teamRepo =
-  String(env.teamRepository).toLowerCase() === "sqlserver"
-    ? new SqlServerTeamRepository()
-    : new InMemoryTeamRepository(seedTeams);
 
 // PARTS (store catalog)
 const seedParts = [
@@ -115,6 +99,18 @@ const partRepo =
 const partService = new PartService(partRepo);
 const partController = makePartController(partService);
 router.use("/parts", makePartRoutes(partController));
+
+// SPONSORS
+const sponsorRepo = new SqlServerSponsorRepository();
+const sponsorService = new SponsorService(sponsorRepo);
+const sponsorController = new SponsorController(sponsorService);
+router.use("/sponsors", makeSponsorRoutes(sponsorController));
+
+// TEAMS
+const teamRepo =
+  String(env.teamRepository).toLowerCase() === "sqlserver"
+    ? new SqlServerTeamRepository()
+    : new InMemoryTeamRepository([]); // 👈 no metas seedTeams “fake” si estás probando BD
 
 const teamService = new TeamService(teamRepo, partRepo);
 const teamController = makeTeamController(teamService);

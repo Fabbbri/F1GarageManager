@@ -7,6 +7,7 @@ import Dashboard from "../pages/Dashboard";
 import Teams from "../pages/Teams";
 import Store from "../pages/Store";
 import Assembly from "../pages/Assembly";
+import Sponsors from "../pages/Sponsors";
 
 import ProtectedRoute from "../components/ProtectedRoute";
 import AppShell from "../components/AppShell";
@@ -34,6 +35,7 @@ export default function AppRoutes() {
         <Route path="/assembly" element={<Assembly />} />
         <Route path="/store" element={<Store />} />
         <Route path="/teams/:id" element={<TeamDetail />} />
+        <Route path="sponsors" element={<Sponsors />} />
       </Route>
 
       <Route path="*" element={<div style={{ padding: 24 }}>404</div>} />

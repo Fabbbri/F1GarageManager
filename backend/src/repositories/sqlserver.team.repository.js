@@ -210,7 +210,7 @@ export class SqlServerTeamRepository extends TeamRepository {
       const result = await pool
         .request()
         .input("TeamId", sql.UniqueIdentifier, teamId)
-        .input("SponsorId", sql.UniqueIdentifier, sponsor.id)
+        .input("SponsorId", sql.Int, sponsor.id)
         .input("Name", sql.NVarChar(120), sponsor.name)
         .input("Contribution", sql.Decimal(18, 2), Number(sponsor.contribution ?? 0))
         .input("Description", sql.NVarChar(300), sponsor.description || null)
@@ -229,7 +229,7 @@ export class SqlServerTeamRepository extends TeamRepository {
       const result = await pool
         .request()
         .input("TeamId", sql.UniqueIdentifier, teamId)
-        .input("SponsorId", sql.UniqueIdentifier, sponsorId)
+        .input("SponsorId", sql.Int, sponsorId)
         .execute("dbo.Team_RemoveSponsor");
 
       return mapTeamFromRecordsets(result.recordsets);
@@ -491,4 +491,29 @@ export class SqlServerTeamRepository extends TeamRepository {
     const affected = result.recordset?.[0]?.affected ?? 0;
     return affected > 0;
   }
+
+  async addEarning(teamId, { sponsorId, contribution, description }) {
+  const pool = await getSqlPool();
+
+  const sid = Number.parseInt(String(sponsorId), 10);
+  if (!Number.isInteger(sid) || sid <= 0) {
+    throw new Error(`SponsorId inválido: ${sponsorId}`);
+  }
+
+  const amt = Number(contribution);
+  if (!Number.isFinite(amt) || amt < 0) {
+    throw new Error(`Contribution inválida: ${contribution}`);
+  }
+
+  const result = await pool.request()
+    .input("TeamId", sql.UniqueIdentifier, teamId)
+    .input("SponsorId", sql.Int, sid)
+    .input("Contribution", sql.Decimal(18, 2), amt)
+    .input("Description", sql.NVarChar(300), description ?? null)
+    .execute("dbo.Team_AddEarning");
+
+  return result.recordset ?? { ok: true };
 }
+}
+
+

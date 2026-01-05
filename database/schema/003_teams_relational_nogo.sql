@@ -70,9 +70,9 @@ BEGIN
 END
 
 -- Sponsors
-IF OBJECT_ID('dbo.TEAM_SPONSOR', 'U') IS NULL
+IF OBJECT_ID('dbo.TEAM_EARNINGS', 'U') IS NULL
 BEGIN
-  CREATE TABLE dbo.TEAM_SPONSOR (
+  CREATE TABLE dbo.TEAM_EARNINGS (
     Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamSponsors PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
     Name NVARCHAR(120) NOT NULL,
@@ -84,19 +84,19 @@ BEGIN
   );
 END
 
-IF OBJECT_ID('dbo.TEAM_SPONSOR', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.TEAM_EARNINGS', 'U') IS NOT NULL
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_SPONSOR') AND name = 'IX_TeamSponsors_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_SPONSOR') AND name = 'IX_TeamSponsors_TeamId')
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_EARNINGS') AND name = 'IX_TeamSponsors_TeamId')
+     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_EARNINGS') AND name = 'IX_TeamSponsors_TeamId')
   BEGIN
-    CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TEAM_SPONSOR(TeamId);
+    CREATE INDEX IX_TeamSponsors_TeamId ON dbo.TEAM_EARNINGS(TeamId);
   END
 END
 
 -- Add Description if upgrading an existing database
-IF COL_LENGTH('dbo.TEAM_SPONSOR', 'Description') IS NULL
+IF COL_LENGTH('dbo.TEAM_EARNINGS', 'Description') IS NULL
 BEGIN
-  ALTER TABLE dbo.TEAM_SPONSOR ADD Description NVARCHAR(300) NULL;
+  ALTER TABLE dbo.TEAM_EARNINGS ADD Description NVARCHAR(300) NULL;
 END
 
 -- Cars (max 2 per team enforced in SP)
@@ -376,10 +376,19 @@ BEGIN
   LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
   WHERE t.Id = @Id;
 
-  SELECT Id, TeamId, Name, Contribution, Description, CreatedAt
-  FROM dbo.TEAM_SPONSOR s
-  WHERE s.TeamId = @Id
-  ORDER BY s.CreatedAt DESC;
+  SELECT
+  te.Id,
+  te.TeamId,
+  te.SponsorId,
+  sp.nombre AS SponsorName,
+  te.Contribution,
+  te.Description,
+  te.CreatedAt
+  FROM dbo.TEAM_EARNINGS te
+  JOIN dbo.SPONSOR sp ON sp.id = te.SponsorId
+  WHERE te.TeamId = @Id
+  ORDER BY te.CreatedAt DESC;
+
 
   SELECT
     ii.Id,
@@ -560,10 +569,9 @@ END';
 EXEC sys.sp_executesql @sql;
 
 -- Team_AddSponsor
-SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddSponsor
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddEarning
   @TeamId UNIQUEIDENTIFIER,
-  @SponsorId UNIQUEIDENTIFIER,
-  @Name NVARCHAR(120),
+  @SponsorId INT,
   @Contribution DECIMAL(18,2) = 0,
   @Description NVARCHAR(300) = NULL
 AS
@@ -571,28 +579,27 @@ BEGIN
   SET NOCOUNT ON;
 
   IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
-  BEGIN
-    RAISERROR(''Equipo no encontrado.'', 16, 1);
-    RETURN;
-  END
-  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
-  BEGIN
-    RAISERROR(''Nombre de patrocinador requerido.'', 16, 1);
-    RETURN;
-  END
+  BEGIN RAISERROR(''Equipo no encontrado.'', 16, 1); RETURN; END
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.SPONSOR WHERE id = @SponsorId)
+  BEGIN RAISERROR(''Sponsor no encontrado.'', 16, 1); RETURN; END
+
   IF @Contribution < 0
-  BEGIN
-    RAISERROR(''Contribución inválida.'', 16, 1);
-    RETURN;
-  END
+  BEGIN RAISERROR(''Contribución inválida.'', 16, 1); RETURN; END
 
-  INSERT INTO dbo.TEAM_SPONSOR (Id, TeamId, Name, Contribution, Description)
-  VALUES (@SponsorId, @TeamId, LTRIM(RTRIM(@Name)), @Contribution, NULLIF(LTRIM(RTRIM(@Description)), ''''));
+  INSERT INTO dbo.TEAM_EARNINGS (Id, TeamId, SponsorId, Name, Contribution, Description)
+  VALUES (
+    NEWID(),
+    @TeamId,
+    @SponsorId,
+    (SELECT nombre FROM dbo.SPONSOR WHERE id = @SponsorId),
+    @Contribution,
+    NULLIF(LTRIM(RTRIM(@Description)), '''')
+  );
 
-  -- Regla: presupuesto total calculado a partir de aportes registrados
   UPDATE dbo.TEAM_BUDGET
   SET
-    Total = COALESCE((SELECT SUM(s.Contribution) FROM dbo.TEAM_SPONSOR s WHERE s.TeamId = @TeamId), 0),
+    Total = COALESCE((SELECT SUM(e.Contribution) FROM dbo.TEAM_EARNINGS e WHERE e.TeamId = @TeamId), 0),
     UpdatedAt = SYSUTCDATETIME()
   WHERE TeamId = @TeamId;
 
@@ -601,25 +608,6 @@ BEGIN
 END';
 EXEC sys.sp_executesql @sql;
 
--- Team_RemoveSponsor
-SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveSponsor
-  @TeamId UNIQUEIDENTIFIER,
-  @SponsorId UNIQUEIDENTIFIER
-AS
-BEGIN
-  SET NOCOUNT ON;
-
-  DELETE FROM dbo.TEAM_SPONSOR WHERE TeamId = @TeamId AND Id = @SponsorId;
-  IF @@ROWCOUNT = 0
-  BEGIN
-    RAISERROR(''Patrocinador no encontrado.'', 16, 1);
-    RETURN;
-  END
-
-  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
-  EXEC dbo.Team_GetById @Id = @TeamId;
-END';
-EXEC sys.sp_executesql @sql;
 
 -- Team_AddCar
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddCar

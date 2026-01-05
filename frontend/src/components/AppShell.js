@@ -21,6 +21,8 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import BuildIcon from "@mui/icons-material/Build";
 import LogoutIcon from "@mui/icons-material/Logout";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+
 
 const drawerWidth = 260;
 const drawerCollapsedWidth = 72;
@@ -107,6 +109,9 @@ export default function AppShell() {
             <NavItem to="/assembly" icon={<BuildIcon />} label="Armado" collapsed={desktopCollapsed} />
             <NavItem to="/store" icon={<StorefrontIcon />} label="Tienda" collapsed={desktopCollapsed} />
           </>
+        )}
+        {isAdmin && (
+          <NavItem to="/sponsors" icon={<AttachMoneyIcon />} label="Patrocinadores" collapsed={desktopCollapsed} />
         )}
       </List>
 
