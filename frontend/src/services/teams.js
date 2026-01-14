@@ -125,3 +125,18 @@ export async function listEngineers() {
   return await handle(await fetch(`${API_URL}/users?role=ENGINEER`, { headers: headers() }));
 }
 
+export async function listTeamEngineers(teamId) {
+  return await handle(
+    await fetch(`${API_URL}/teams/${teamId}/engineers`, { headers: headers() })
+  );
+}
+
+export async function unassignEngineer(teamId, userId) {
+  return await handle(
+    await fetch(`${API_URL}/teams/${teamId}/engineers/${userId}`, {
+      method: "DELETE",
+      headers: headers(),
+    })
+  );
+}
+

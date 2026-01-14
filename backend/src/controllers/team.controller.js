@@ -46,6 +46,15 @@ export function makeTeamController(teamService) {
       })
     ),
 
+    listEngineersByTeam: asyncHandler(async (req, res) =>
+      res.json({ engineers: await teamService.listEngineersByTeam(req.params.id, req.auth) })
+    ),
+
+    unassignEngineer: asyncHandler(async (req, res) => {
+      await teamService.unassignEngineer(req.params.id, req.params.userId);
+      res.status(204).send();
+    }),
+
   };
   
 }

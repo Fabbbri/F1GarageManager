@@ -5,9 +5,14 @@ import {
   addSponsor, deleteSponsor,
   deleteCar,
   addDriver, deleteDriver,
-  addDriverResult
+  addDriverResult, listEngineers,
+  listTeamEngineers, assignEngineer, unassignEngineer
 } from "../services/teams";
+
+import { listEngineersAvailable } from "../services/users";
+
 import { getSession } from "../services/auth";
+
 import {
   Box,
   Card,
@@ -42,6 +47,7 @@ function Section({ title, children }) {
 export default function TeamDetail() {
   const { id } = useParams();
   const session = getSession();
+  const isAdmin = useMemo(() => session?.role === "ADMIN", [session]);
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
 
   const [team, setTeam] = useState(null);
@@ -67,6 +73,12 @@ export default function TeamDetail() {
   const [rRace, setRRace] = useState("");
   const [rPos, setRPos] = useState("");
   const [rPoints, setRPoints] = useState("");
+  const [engineers, setEngineers] = useState([]);          // lista global (para dropdown)
+  const [teamEngineers, setTeamEngineers] = useState([]);  // asignados a este team
+  const [selectedEngineer, setSelectedEngineer] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [loadingTeamEngineers, setLoadingTeamEngineers] = useState(false);
+
 
   async function reload() {
     setError("");
@@ -82,6 +94,11 @@ export default function TeamDetail() {
   }
 
   useEffect(() => { reload(); }, [id]);
+  useEffect(() => {
+    if (!team?.id) return;
+    loadTeamEngineers(team.id);
+    loadEngineersCatalog();
+  }, [team?.id]);
 
   if (loading)
     return (
@@ -161,6 +178,44 @@ export default function TeamDetail() {
     return { races, avgPosition, avgPoints, bestPosition, totalPoints };
   };
 
+  async function loadEngineersCatalog() {
+  if (!isAdmin) return;
+  const res = await listEngineersAvailable(); // /users?role=ENGINEER
+  const arr = Array.isArray(res?.users) ? res.users : [];
+  setEngineers(arr);
+}
+
+async function loadTeamEngineers(teamId) {
+  setLoadingTeamEngineers(true);
+  try {
+    const res = await listTeamEngineers(teamId); // /teams/:id/engineers
+    const arr = Array.isArray(res?.engineers) ? res.engineers : (Array.isArray(res) ? res : []);
+    setTeamEngineers(arr.filter(Boolean));
+  } finally {
+    setLoadingTeamEngineers(false);
+  }
+}
+
+async function submitAssignEngineer() {
+  if (!selectedEngineer) return;
+  try {
+    setAssigning(true);
+    await assignEngineer(team.id, selectedEngineer); // POST /teams/:id/engineer
+    setSelectedEngineer("");
+    await loadTeamEngineers(team.id);
+    await loadEngineersCatalog();
+  } finally {
+    setAssigning(false);
+  }
+}
+
+async function onUnassignEngineer(userId) {
+  if (!window.confirm("¿Desasignar este engineer del equipo?")) return;
+  await unassignEngineer(team.id, userId); // DELETE /teams/:id/engineers/:userId
+  await loadTeamEngineers(team.id);
+  await loadEngineersCatalog();
+}
+
   return (
     <Box>
       <Box sx={{ maxWidth: 1100, mx: "auto" }}>
@@ -182,6 +237,7 @@ export default function TeamDetail() {
               <Tab label="Patrocinadores" />
               <Tab label="Inventario" />
               <Tab label="Carros" />
+              <Tab label="Ingenieros" />
               <Tab label="Conductores" />
             </Tabs>
           </CardContent>
@@ -357,7 +413,7 @@ export default function TeamDetail() {
           </Section>
         )}
 
-        {tab === 4 && (
+        {tab === 5 && (
           <Section title="Conductores">
             <Stack spacing={2}>
               <Box component="form" onSubmit={onAddDriver}>
@@ -426,6 +482,95 @@ export default function TeamDetail() {
                   ))}
                 </Stack>
               )}
+            </Stack>
+          </Section>
+        )}
+        {tab === 4 && (
+          <Section title="Ingenieros">
+            <Stack spacing={2}>
+
+              {isAdmin && (
+                <Card>
+                  <CardContent>
+                    <Typography fontWeight={700} sx={{ mb: 1 }}>
+                      Asignar ingeniero al equipo
+                    </Typography>
+
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Ingeniero"
+                        value={selectedEngineer}
+                        onChange={(e) => setSelectedEngineer(e.target.value)}
+                        SelectProps={{ native: true }}
+                      >
+                        <option value="" disabled></option>
+                        {(engineers || []).filter(Boolean).map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name || u.email || u.id}
+                          </option>
+                        ))}
+                      </TextField>
+
+                      <Button
+                        variant="contained"
+                        disabled={!selectedEngineer || assigning}
+                        onClick={submitAssignEngineer}
+                      >
+                        {assigning ? "Asignando..." : "Asignar"}
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardContent>
+                  <Typography fontWeight={700} sx={{ mb: 1 }}>
+                    Ingenieros asignados
+                  </Typography>
+
+                  {loadingTeamEngineers ? (
+                    <Typography color="text.secondary">Cargando...</Typography>
+                  ) : teamEngineers.length === 0 ? (
+                    <Typography color="text.secondary">No hay engineers asignados.</Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {teamEngineers.map((u) => (
+                        <Box
+                          key={u.id}
+                          sx={{
+                            p: 2,
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                          }}
+                        >
+                          <Box sx={{ flex: 1 }}>
+                            <Typography fontWeight={800}>{u.name || "—"}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {u.email || ""} {u.role ? `• ${u.role}` : ""}
+                            </Typography>
+                          </Box>
+
+                          {isAdmin && (
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              onClick={() => onUnassignEngineer(u.id)}
+                            >
+                              Desasignar
+                            </Button>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </CardContent>
+              </Card>
             </Stack>
           </Section>
         )}

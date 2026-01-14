@@ -62,23 +62,49 @@ export class SqlServerUserRepository extends UserRepository {
     return (result.recordset || []).map(mapUserRow);
   }
 
-  async list({ role } = {}) {
+  async list({ role, unassigned } = {}) {
     const pool = await getSqlPool();
     const req = pool.request();
 
-    let query = `SELECT Id, Name, Email, Role FROM dbo.[USER]`;
+    let sqlText = `
+      SELECT u.Id, u.Name, u.Email, u.Role
+      FROM dbo.[USER] u
+    `;
+
+    const where = [];
+
+    if (unassigned) {
+      sqlText += ` LEFT JOIN dbo.TEAM_ENGINEER te ON te.UserId = u.Id `;
+      where.push(` te.UserId IS NULL `);
+    }
+
     if (role) {
-      query += ` WHERE Role = @Role`;
+      where.push(` u.Role = @Role `);
       req.input("Role", sql.NVarChar(20), role);
     }
-    query += ` ORDER BY Name ASC`;
 
-    const r = await req.query(query);
-    return r.recordset.map(u => ({
+    if (where.length) sqlText += ` WHERE ` + where.join(" AND ");
+    sqlText += ` ORDER BY u.Name ASC;`;
+
+    const r = await req.query(sqlText);
+
+    return (r.recordset || []).map((u) => ({
       id: String(u.Id),
       name: u.Name,
       email: u.Email,
       role: u.Role,
+    }));
+  }
+
+  async listEngineersAvailable() {
+    const pool = await getSqlPool();
+    const r = await pool.request().execute("dbo.User_ListEngineersAvailable");
+
+    return (r.recordset || []).map((u) => ({
+      id: String(u.Id),
+      name: u.Name ?? "",
+      email: u.Email ?? "",
+      role: u.Role ?? "",
     }));
   }
 }

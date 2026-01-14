@@ -60,6 +60,13 @@ BEGIN
   EXEC sys.sp_rename @objname = N'dbo.TeamSponsors', @newname = N'TEAM_SPONSOR', @objtype = N'OBJECT';
 END
 
+-- TEAM_SPONSOR -> TEAM_EARNINGS 
+IF OBJECT_ID(N'dbo.TEAM_SPONSOR', 'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.TEAM_EARNINGS', 'U') IS NULL
+BEGIN
+  EXEC sys.sp_rename @objname = N'dbo.TEAM_SPONSOR', @newname = N'TEAM_EARNINGS', @objtype = N'OBJECT';
+END
+
 -- TeamCars -> TEAM_CAR
 IF OBJECT_ID(N'dbo.TeamCars', 'U') IS NOT NULL
    AND OBJECT_ID(N'dbo.TEAM_CAR', 'U') IS NULL

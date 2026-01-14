@@ -949,7 +949,7 @@ BEGIN
 END';
 EXEC sys.sp_executesql @sql;
 
--- Team_AssignEngineer
+-- Team_AssignEngineer 
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AssignEngineer
   @TeamId UNIQUEIDENTIFIER,
   @UserId UNIQUEIDENTIFIER
@@ -972,12 +972,10 @@ BEGIN
     WHERE UserId = @UserId;
   ELSE
     INSERT INTO dbo.TEAM_ENGINEER(TeamId, UserId) VALUES (@TeamId, @UserId);
-
-  EXEC dbo.Team_GetById @Id = @TeamId;
 END';
 EXEC sys.sp_executesql @sql;
 
--- Team_RemoveEngineer
+-- Team_RemoveEngineer 
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_RemoveEngineer
   @UserId UNIQUEIDENTIFIER
 AS
@@ -1036,6 +1034,65 @@ BEGIN
   FROM dbo.TEAM t;
 END';
 EXEC sys.sp_executesql @sql;
+
+-- Team_ListEngineers
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_ListEngineers
+  @TeamId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
+  BEGIN
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
+  END
+
+  SELECT
+    u.Id,
+    u.Name,
+    u.Email,
+    u.Role,
+    te.AssignedAt
+  FROM dbo.TEAM_ENGINEER te
+  JOIN dbo.[USER] u ON u.Id = te.UserId
+  WHERE te.TeamId = @TeamId
+    AND u.Role = ''ENGINEER''
+  ORDER BY te.AssignedAt DESC;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_UnassignEngineer
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_UnassignEngineer
+  @TeamId UNIQUEIDENTIFIER,
+  @UserId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
+  BEGIN
+    RAISERROR(''Equipo no encontrado.'', 16, 1);
+    RETURN;
+  END
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.[USER] WHERE Id = @UserId)
+  BEGIN
+    RAISERROR(''Usuario no encontrado.'', 16, 1);
+    RETURN;
+  END
+
+  DELETE FROM dbo.TEAM_ENGINEER
+  WHERE TeamId = @TeamId AND UserId = @UserId;
+
+  IF @@ROWCOUNT = 0
+  BEGIN
+    RAISERROR(''El engineer no estaba asignado a este equipo.'', 16, 1);
+    RETURN;
+  END
+END';
+EXEC sys.sp_executesql @sql;
+
 
 -- Team_AssignCarDriver
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AssignCarDriver

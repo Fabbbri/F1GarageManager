@@ -88,3 +88,25 @@ BEGIN
   EXEC dbo.User_GetById @Id = @Id;
 END
 GO
+
+DECLARE @sql NVARCHAR(MAX);
+
+-- User_ListEngineersAvailable
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.User_ListEngineersAvailable
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  SELECT
+    u.Id,
+    u.Name,
+    u.Email,
+    u.Role
+  FROM dbo.[USER] u
+  LEFT JOIN dbo.TEAM_ENGINEER te
+    ON te.UserId = u.Id
+  WHERE u.Role = ''ENGINEER''
+    AND te.UserId IS NULL
+  ORDER BY u.Name ASC;
+END';
+EXEC sys.sp_executesql @sql;

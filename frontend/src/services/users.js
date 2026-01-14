@@ -13,5 +13,13 @@ async function handle(res) {
 }
 
 export async function listEngineers() {
-  return await handle(await fetch(`${API_URL}/users?role=ENGINEER`, { headers: headers() }));
+  return await handle(
+    await fetch(`${API_URL}/users?role=ENGINEER&unassigned=1`, { headers: headers() })
+  );
+}
+
+export async function listEngineersAvailable() {
+  return await handle(
+    await fetch(`${API_URL}/users/engineers/available`, { headers: headers() })
+  );
 }

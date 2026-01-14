@@ -452,6 +452,14 @@ export class TeamService {
     return await this.teamRepo.assignEngineer(teamId, userId); // ejecuta SP
   }
 
+  async listEngineersByTeam(teamId, auth) {
+    return await this.teamRepo.listEngineersByTeam(teamId);
+  }
+
+  async unassignEngineer(teamId, userId) {
+    return await this.teamRepo.unassignEngineer(teamId, userId);
+  }
+
   
 
   _err(status, message) {

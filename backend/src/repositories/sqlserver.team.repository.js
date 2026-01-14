@@ -540,6 +540,34 @@ async assignEngineer(teamId, userId) {
 
   return mapTeamFromRecordsets(result.recordsets);
 }
+
+async listEngineersByTeam(teamId) {
+  const pool = await getSqlPool();
+  const r = await pool.request()
+    .input("TeamId", sql.UniqueIdentifier, teamId)
+    .execute("dbo.Team_ListEngineers");
+
+  return (r.recordset || []).map((row) => ({
+    id: String(row.Id),
+    name: row.Name ?? "",
+    email: row.Email ?? "",
+    role: row.Role ?? "",
+    assignedAt: iso(row.AssignedAt),
+  }));
 }
+
+async unassignEngineer(teamId, userId) {
+  const pool = await getSqlPool();
+
+  await pool.request()
+    .input("TeamId", sql.UniqueIdentifier, teamId)
+    .input("UserId", sql.UniqueIdentifier, userId)
+    .execute("dbo.Team_UnassignEngineer");
+
+  return true;
+}
+}
+
+
 
 
