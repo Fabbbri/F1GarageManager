@@ -155,25 +155,11 @@ export class TeamService {
   }
 
   // -------- Drivers ----------
-  async addDriver(teamId, { name, skill }) {
-    await this.getById(teamId);
-    if (!name?.trim()) throw this._err(400, "Nombre de conductor requerido.");
-
-    const numericSkill = Number(skill ?? 50);
-    if (!Number.isInteger(numericSkill) || numericSkill < 0 || numericSkill > 100) {
-      throw this._err(400, "Habilidad inválida: debe ser un entero entre 0 y 100.");
-    }
-
-    const driver = {
-      id: globalThis.crypto?.randomUUID?.() || String(Date.now()),
-      name: name.trim(),
-      skill: numericSkill,
-      results: [],
-    };
-
-    const updated = await this.teamRepo.addDriver(teamId, driver);
-    if (!updated) throw this._err(404, "Equipo no encontrado.");
-    return updated;
+  async addDriver(teamId, { driverId, skill }) {
+    if (!driverId) throw this._err(400, "driverId requerido.");
+    const s = Number.parseInt(String(skill ?? 50), 10);
+    if (!Number.isInteger(s) || s < 0 || s > 100) throw this._err(400, "Habilidad inválida.");
+    return await this.teamRepo.addDriver(teamId, { driverId, skill: s });
   }
 
   async removeDriver(teamId, driverId) {
@@ -182,6 +168,13 @@ export class TeamService {
     if (!updated) throw this._err(404, "Conductor no encontrado.");
     return updated;
   }
+
+  async updateDriverSkill(teamId, driverId, skill) {
+    const s = Number.parseInt(String(skill), 10);
+    if (!Number.isInteger(s) || s < 0 || s > 100) throw this._err(400, "Habilidad inválida.");
+    return await this.teamRepo.updateDriverSkill(teamId, driverId, s);
+  }
+
 
   async addDriverResult(teamId, driverId, { date, race, position, points }) {
     const team = await this.getById(teamId);

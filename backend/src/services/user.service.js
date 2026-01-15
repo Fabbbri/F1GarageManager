@@ -11,6 +11,10 @@ export class UserService {
     return await this.userRepo.listEngineersAvailable();
   }
 
+  async listDriversAvailable() {
+    return await this.userRepo.listDriversAvailable();
+  }
+
   
 }
 

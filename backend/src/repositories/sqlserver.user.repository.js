@@ -107,5 +107,15 @@ export class SqlServerUserRepository extends UserRepository {
       role: u.Role ?? "",
     }));
   }
+  async listDriversAvailable() {
+    const pool = await getSqlPool();
+    const r = await pool.request().execute("dbo.User_ListDriversAvailable");
+    return (r.recordset || []).map(u => ({
+      id: String(u.Id),
+      name: u.Name ?? "",
+      email: u.Email ?? "",
+      role: u.Role ?? "",
+    }));
+  }
 }
 

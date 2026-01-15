@@ -143,23 +143,20 @@ END
 IF OBJECT_ID('dbo.TEAM_DRIVER', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.TEAM_DRIVER (
-    Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_TeamDrivers PRIMARY KEY,
     TeamId UNIQUEIDENTIFIER NOT NULL,
-    Name NVARCHAR(120) NOT NULL,
+    UserId UNIQUEIDENTIFIER NOT NULL,
     Skill INT NOT NULL CONSTRAINT DF_TeamDrivers_Skill DEFAULT (50),
-    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamDrivers_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT FK_TeamDrivers_Teams FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
+    AssignedAt DATETIME2(0) NOT NULL CONSTRAINT DF_TeamDrivers_AssignedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT PK_TeamDrivers PRIMARY KEY (UserId), -- 1 driver solo en 1 team
+    CONSTRAINT FK_TeamDrivers_Team FOREIGN KEY (TeamId) REFERENCES dbo.TEAM(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_TeamDrivers_User FOREIGN KEY (UserId) REFERENCES dbo.[USER](Id) ON DELETE CASCADE,
     CONSTRAINT CK_TeamDrivers_Skill CHECK (Skill >= 0 AND Skill <= 100)
   );
 END
 
-IF OBJECT_ID('dbo.TEAM_DRIVER', 'U') IS NOT NULL
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_DRIVER') AND name = 'IX_TeamDrivers_TeamId')
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TEAM_DRIVER') AND name = 'IX_TeamDrivers_TeamId')
-     AND NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID('dbo.TEAM_DRIVER') AND name = 'IX_TeamDrivers_TeamId')
-  BEGIN
-    CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TEAM_DRIVER(TeamId);
-  END
+  CREATE INDEX IX_TeamDrivers_TeamId ON dbo.TEAM_DRIVER(TeamId);
 END
 
 IF OBJECT_ID('dbo.TEAM_ENGINEER', 'U') IS NULL
@@ -396,18 +393,17 @@ BEGIN
   WHERE t.Id = @Id;
 
   SELECT
-  te.Id,
-  te.TeamId,
-  te.SponsorId,
-  sp.nombre AS SponsorName,
-  te.Contribution,
-  te.Description,
-  te.CreatedAt
+    te.Id,
+    te.TeamId,
+    te.SponsorId,
+    sp.nombre AS SponsorName,
+    te.Contribution,
+    te.Description,
+    te.CreatedAt
   FROM dbo.TEAM_EARNINGS te
   JOIN dbo.SPONSOR sp ON sp.id = te.SponsorId
   WHERE te.TeamId = @Id
   ORDER BY te.CreatedAt DESC;
-
 
   SELECT
     ii.Id,
@@ -450,12 +446,21 @@ BEGIN
   WHERE ip.TeamId = @Id
   ORDER BY ip.InstalledAt DESC;
 
-  SELECT Id, TeamId, Name, Skill
-  FROM dbo.TEAM_DRIVER d
-  WHERE d.TeamId = @Id
-  ORDER BY d.CreatedAt DESC;
+  --  DRIVERS (nuevo modelo: TEAM_DRIVER es puente a USER)
+  SELECT
+    td.UserId AS Id,
+    td.TeamId,
+    u.Name,
+    td.Skill,
+    td.AssignedAt
+  FROM dbo.TEAM_DRIVER td
+  JOIN dbo.[USER] u ON u.Id = td.UserId
+  WHERE td.TeamId = @Id
+    AND u.Role = ''DRIVER''
+  ORDER BY td.AssignedAt DESC;
 END';
 EXEC sys.sp_executesql @sql;
+
 
 -- Team_List
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_List
@@ -1105,16 +1110,17 @@ BEGIN
   SET XACT_ABORT ON;
 
   IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
-  BEGIN
-    RAISERROR(''Equipo no encontrado.'', 16, 1);
-    RETURN;
-  END
+  BEGIN RAISERROR(''Equipo no encontrado.'', 16, 1); RETURN; END
+
   IF NOT EXISTS (SELECT 1 FROM dbo.TEAM_CAR WHERE TeamId = @TeamId AND Id = @CarId)
-  BEGIN
-    RAISERROR(''Carro no encontrado.'', 16, 1);
-    RETURN;
-  END
-  IF @DriverId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.TEAM_DRIVER WHERE TeamId = @TeamId AND Id = @DriverId)
+  BEGIN RAISERROR(''Carro no encontrado.'', 16, 1); RETURN; END
+
+  IF @DriverId IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM dbo.TEAM_DRIVER td
+    JOIN dbo.[USER] u ON u.Id = td.UserId
+    WHERE td.TeamId = @TeamId AND td.UserId = @DriverId AND u.Role = ''DRIVER''
+  )
   BEGIN
     RAISERROR(''Conductor no encontrado.'', 16, 1);
     RETURN;
@@ -1229,30 +1235,32 @@ EXEC sys.sp_executesql @sql;
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_AddDriver
   @TeamId UNIQUEIDENTIFIER,
   @DriverId UNIQUEIDENTIFIER,
-  @Name NVARCHAR(120),
   @Skill INT = 50
 AS
 BEGIN
   SET NOCOUNT ON;
 
   IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
-  BEGIN
-    RAISERROR(''Equipo no encontrado.'', 16, 1);
-    RETURN;
-  END
-  IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
-  BEGIN
-    RAISERROR(''Nombre de conductor requerido.'', 16, 1);
-    RETURN;
-  END
-  IF @Skill < 0 OR @Skill > 100
-  BEGIN
-    RAISERROR(''Habilidad inválida.'', 16, 1);
-    RETURN;
-  END
+  BEGIN RAISERROR(''Equipo no encontrado.'', 16, 1); RETURN; END
 
-  INSERT INTO dbo.TEAM_DRIVER (Id, TeamId, Name, Skill)
-  VALUES (@DriverId, @TeamId, LTRIM(RTRIM(@Name)), @Skill);
+  IF NOT EXISTS (SELECT 1 FROM dbo.[USER] WHERE Id = @DriverId AND Role = ''DRIVER'')
+  BEGIN RAISERROR(''Conductor inválido.'', 16, 1); RETURN; END
+
+  IF @Skill < 0 OR @Skill > 100
+  BEGIN RAISERROR(''Habilidad inválida.'', 16, 1); RETURN; END
+
+  -- si el driver ya está asignado a otro team, se mueve a este (1 driver -> 1 team)
+  IF EXISTS (SELECT 1 FROM dbo.TEAM_DRIVER WHERE UserId = @DriverId)
+  BEGIN
+    UPDATE dbo.TEAM_DRIVER
+      SET TeamId = @TeamId, Skill = @Skill, AssignedAt = SYSUTCDATETIME()
+    WHERE UserId = @DriverId;
+  END
+  ELSE
+  BEGIN
+    INSERT INTO dbo.TEAM_DRIVER (TeamId, UserId, Skill)
+    VALUES (@TeamId, @DriverId, @Skill);
+  END
 
   UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
   EXEC dbo.Team_GetById @Id = @TeamId;
@@ -1267,7 +1275,80 @@ AS
 BEGIN
   SET NOCOUNT ON;
 
-  DELETE FROM dbo.TEAM_DRIVER WHERE TeamId = @TeamId AND Id = @DriverId;
+  DELETE FROM dbo.TEAM_DRIVER
+  WHERE TeamId = @TeamId AND UserId = @DriverId;
+
+  IF @@ROWCOUNT = 0
+  BEGIN
+    RAISERROR(''Conductor no encontrado.'', 16, 1);
+    RETURN;
+  END
+
+  UPDATE dbo.TEAM SET UpdatedAt = SYSUTCDATETIME() WHERE Id = @TeamId;
+  EXEC dbo.Team_GetById @Id = @TeamId;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_ListDrivers
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_ListDrivers
+  @TeamId UNIQUEIDENTIFIER
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.TEAM WHERE Id = @TeamId)
+  BEGIN RAISERROR(''Equipo no encontrado.'', 16, 1); RETURN; END
+
+  SELECT
+    td.UserId AS Id,
+    td.TeamId,
+    u.Name,
+    u.Email,
+    td.Skill,
+    td.AssignedAt
+  FROM dbo.TEAM_DRIVER td
+  JOIN dbo.[USER] u ON u.Id = td.UserId
+  WHERE td.TeamId = @TeamId
+    AND u.Role = ''DRIVER''
+  ORDER BY td.AssignedAt DESC;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- User_ListDriversAvailable
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.User_ListDriversAvailable
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  SELECT
+    u.Id,
+    u.Name,
+    u.Email,
+    u.Role
+  FROM dbo.[USER] u
+  LEFT JOIN dbo.TEAM_DRIVER td ON td.UserId = u.Id
+  WHERE u.Role = ''DRIVER''
+    AND td.UserId IS NULL
+  ORDER BY u.Name ASC;
+END';
+EXEC sys.sp_executesql @sql;
+
+-- Team_UpdateDriverSkill
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_UpdateDriverSkill
+  @TeamId UNIQUEIDENTIFIER,
+  @DriverId UNIQUEIDENTIFIER,
+  @Skill INT
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  IF @Skill < 0 OR @Skill > 100
+  BEGIN RAISERROR(''Habilidad inválida.'', 16, 1); RETURN; END
+
+  UPDATE dbo.TEAM_DRIVER
+    SET Skill = @Skill
+  WHERE TeamId = @TeamId AND UserId = @DriverId;
+
   IF @@ROWCOUNT = 0
   BEGIN
     RAISERROR(''Conductor no encontrado.'', 16, 1);

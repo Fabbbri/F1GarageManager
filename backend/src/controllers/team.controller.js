@@ -55,6 +55,10 @@ export function makeTeamController(teamService) {
       res.status(204).send();
     }),
 
+    updateDriverSkill: asyncHandler(async (req, res) =>
+      res.json({ team: await teamService.updateDriverSkill(req.params.id, req.params.driverId, req.body.skill) })
+    ),
+
   };
   
 }

@@ -48,6 +48,8 @@ export function makeTeamRoutes(teamController) {
 
   r.get("/:id/engineers", requireAuth, requireRole("ADMIN","ENGINEER"), teamController.listEngineersByTeam);
   r.delete("/:id/engineers/:userId", requireAuth, requireRole("ADMIN"), teamController.unassignEngineer);
+  r.put("/:id/drivers/:driverId/skill", requireAuth, requireRole("ADMIN"), teamController.updateDriverSkill);
+
 
   return r;
 }

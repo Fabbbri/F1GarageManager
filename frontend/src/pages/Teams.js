@@ -194,12 +194,6 @@ export default function Teams() {
 
                   {isAdmin && (
                     <Stack direction="row" spacing={1} onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="outlined"
-                        onClick={(e) => openAssignDialog(e, t)}
-                      >
-                        Asignar engineer
-                      </Button>
 
                       <Button
                         variant="outlined"

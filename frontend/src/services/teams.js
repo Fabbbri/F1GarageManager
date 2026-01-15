@@ -140,3 +140,13 @@ export async function unassignEngineer(teamId, userId) {
   );
 }
 
+export async function updateDriverSkill(teamId, driverId, skill) {
+  return await handle(
+    await fetch(`${API_URL}/teams/${teamId}/drivers/${driverId}/skill`, {
+      method: "PUT",
+      headers: headers(),
+      body: JSON.stringify({ skill }),
+    })
+  );
+}
+

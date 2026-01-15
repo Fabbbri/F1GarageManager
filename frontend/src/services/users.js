@@ -23,3 +23,8 @@ export async function listEngineersAvailable() {
     await fetch(`${API_URL}/users/engineers/available`, { headers: headers() })
   );
 }
+export async function listDriversAvailable() {
+  return await handle(
+    await fetch(`${API_URL}/users/drivers/available`, { headers: headers() })
+  );
+}

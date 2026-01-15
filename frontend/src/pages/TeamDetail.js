@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, } from "react";
 import { useParams } from "react-router-dom";
 import {
   getTeam,
@@ -6,10 +6,10 @@ import {
   deleteCar,
   addDriver, deleteDriver,
   addDriverResult, listEngineers,
-  listTeamEngineers, assignEngineer, unassignEngineer
+  listTeamEngineers, assignEngineer, unassignEngineer, updateDriverSkill
 } from "../services/teams";
 
-import { listEngineersAvailable } from "../services/users";
+import { listEngineersAvailable, listDriversAvailable } from "../services/users";
 
 import { getSession } from "../services/auth";
 
@@ -30,7 +30,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
+  Chip, Dialog, DialogTitle, DialogActions, DialogContent
 } from "@mui/material";
 
 function Section({ title, children }) {
@@ -78,6 +78,14 @@ export default function TeamDetail() {
   const [selectedEngineer, setSelectedEngineer] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [loadingTeamEngineers, setLoadingTeamEngineers] = useState(false);
+  const [availableDrivers, setAvailableDrivers] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState("");
+  const [assignSkill, setAssignSkill] = useState("50");
+  const [assigningDriver, setAssigningDriver] = useState(false);
+  const [openSkillDialog, setOpenSkillDialog] = useState(false);
+  const [skillDriver, setSkillDriver] = useState(null); // driver seleccionado (obj)
+  const [skillValue, setSkillValue] = useState("50");
+  const [savingSkill, setSavingSkill] = useState(false);
 
 
   async function reload() {
@@ -99,6 +107,9 @@ export default function TeamDetail() {
     loadTeamEngineers(team.id);
     loadEngineersCatalog();
   }, [team?.id]);
+  useEffect(() => {
+    if (tab === 5) loadAvailableDrivers();
+  }, [tab]);
 
   if (loading)
     return (
@@ -107,6 +118,42 @@ export default function TeamDetail() {
       </Box>
     );
   if (!team) return <Alert severity="error">{error || "Equipo no encontrado"}</Alert>;
+
+  const openEditSkill = (driver) => {
+    setSkillDriver(driver);
+    setSkillValue(String(driver?.skill ?? 50));
+    setOpenSkillDialog(true);
+  };
+
+  const closeEditSkill = () => {
+    setOpenSkillDialog(false);
+    setSkillDriver(null);
+    setSkillValue("50");
+  };
+
+  const submitEditSkill = async () => {
+    if (!skillDriver) return;
+
+    const s = Number.parseInt(String(skillValue), 10);
+    if (!Number.isInteger(s) || s < 0 || s > 100) {
+      setError("Skill inválido (0-100).");
+      return;
+    }
+
+    try {
+      setSavingSkill(true);
+      setError("");
+
+      const res = await updateDriverSkill(id, skillDriver.id, s);
+      setTeam(res.team || res);
+      closeEditSkill();
+    } catch (e) {
+      setError(e.message || "Error actualizando skill");
+    } finally {
+      setSavingSkill(false);
+    }
+  };
+
 
   const onAddSponsor = async (e) => {
     e.preventDefault();
@@ -161,12 +208,60 @@ export default function TeamDetail() {
       setError(e2.message);
     }
   };
+  const loadAvailableDrivers = async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await listDriversAvailable();
+      setAvailableDrivers(res.users || []);
+    } catch (e) {
+      setError(e.message || "Error cargando conductores disponibles");
+    }
+  };
+
+  const submitAssignDriver = async () => {
+    if (!selectedDriver) return;
+
+    // skill 0..100 entero
+    const s = Number.parseInt(assignSkill, 10);
+    if (!Number.isInteger(s) || s < 0 || s > 100) {
+      setError("Skill inválido (0-100).");
+      return;
+    }
+
+    try {
+      setAssigningDriver(true);
+      setError("");
+
+      const updated = await addDriver(id, { driverId: selectedDriver, skill: s });
+      setTeam(updated);                 // tu addDriver devuelve team (Team_GetById)
+      setSelectedDriver("");
+      setAssignSkill("50");
+      await loadAvailableDrivers();     // refresca dropdown
+    } catch (e) {
+      setError(e.message || "Error asignando conductor");
+    } finally {
+      setAssigningDriver(false);
+    }
+  };
+
+  const onUnassignDriver = async (driverId) => {
+    if (!window.confirm("¿Desasignar este conductor del equipo?")) return;
+    try {
+      setError("");
+      const updated = await deleteDriver(id, driverId);
+      setTeam(updated);
+      await loadAvailableDrivers();
+    } catch (e) {
+      setError(e.message || "Error desasignando conductor");
+    }
+  };
 
 
   const budgetTotal = Number(team.budget?.total ?? 0);
   const budgetSpent = Number(team.budget?.spent ?? 0);
   const budgetAvailable = budgetTotal - budgetSpent;
   const contributionsTotal = (team.sponsors || []).reduce((s, sp) => s + Number(sp.contribution || 0), 0);
+  
 
   const driverStats = (d) => {
     const results = d.results || [];
@@ -215,6 +310,8 @@ async function onUnassignEngineer(userId) {
   await loadTeamEngineers(team.id);
   await loadEngineersCatalog();
 }
+
+
 
   return (
     <Box>
@@ -416,67 +513,87 @@ async function onUnassignEngineer(userId) {
         {tab === 5 && (
           <Section title="Conductores">
             <Stack spacing={2}>
-              <Box component="form" onSubmit={onAddDriver}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                  <TextField label="Nombre" value={dName} onChange={(e) => setDName(e.target.value)} fullWidth />
-                  <TextField label="Habilidad (0-100)" value={dSkill} onChange={(e) => setDSkill(e.target.value)} fullWidth />
-                  <Button type="submit" variant="contained" disabled={!canEdit}>Agregar</Button>
-                </Stack>
-              </Box>
 
-              <Box component="form" onSubmit={onAddDriverResult}>
-                <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
-                  <FormControl fullWidth>
-                    <InputLabel id="driver-select-label">Conductor</InputLabel>
-                    <Select
-                      labelId="driver-select-label"
-                      label="Conductor"
-                      value={rDriverId}
-                      onChange={(e) => setRDriverId(e.target.value)}
-                    >
-                      {(team.drivers || []).map((d) => (
-                        <MenuItem key={d.id} value={d.id}>
-                          {d.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    label="Fecha"
-                    type="date"
-                    value={rDate}
-                    onChange={(e) => setRDate(e.target.value)}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField label="Carrera" value={rRace} onChange={(e) => setRRace(e.target.value)} fullWidth />
-                  <TextField label="Posición" value={rPos} onChange={(e) => setRPos(e.target.value)} fullWidth />
-                  <TextField label="Puntos" value={rPoints} onChange={(e) => setRPoints(e.target.value)} fullWidth />
-                  <Button type="submit" variant="contained" disabled={!canEdit || !rDriverId}>
-                    Agregar resultado
-                  </Button>
-                </Stack>
-              </Box>
+              {isAdmin && (
+                <Card>
+                  <CardContent>
+                    <Typography fontWeight={700} sx={{ mb: 1 }}>
+                      Asignar conductor
+                    </Typography>
+
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Conductor disponible"
+                        value={selectedDriver}
+                        onChange={(e) => setSelectedDriver(e.target.value)}
+                        SelectProps={{ native: true }}
+                      >
+                        <option value="" disabled></option>
+                        {(availableDrivers || []).filter(Boolean).map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name || u.email || u.id}
+                          </option>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        label="Skill (0-100)"
+                        value={assignSkill}
+                        onChange={(e) => setAssignSkill(e.target.value.replace(/\D/g, ""))}
+                        fullWidth
+                      />
+
+                      <Button
+                        variant="contained"
+                        disabled={!selectedDriver || assigningDriver}
+                        onClick={submitAssignDriver}
+                      >
+                        {assigningDriver ? "Asignando..." : "Asignar"}
+                      </Button>
+                    </Stack>
+
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
 
               <Divider />
 
-              {team.drivers.length === 0 ? (
+              {(team.drivers || []).length === 0 ? (
                 <Typography color="text.secondary">No hay conductores.</Typography>
               ) : (
                 <Stack spacing={1}>
-                  {team.drivers.map(d => (
+                  {(team.drivers || []).map((d) => (
                     <Card key={d.id} variant="outlined">
                       <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography fontWeight={800}>{d.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">Habilidad (H): {d.skill}</Typography>
                           <Typography variant="body2" color="text.secondary">
-                            stats: carreras {driverStats(d).races} • prom pos {driverStats(d).avgPosition.toFixed(2)} • prom pts {driverStats(d).avgPoints.toFixed(2)} • mejor pos {driverStats(d).bestPosition ?? "—"} • total pts {driverStats(d).totalPoints}
+                            Skill: {d.skill}
                           </Typography>
                         </Box>
-                        <Button disabled={!canEdit} onClick={async () => setTeam(await deleteDriver(id, d.id))}>
-                          Eliminar
-                        </Button>
+
+                        {isAdmin && (
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              variant="outlined"
+                              onClick={() => openEditSkill(d)}
+                            >
+                              Modificar skill
+                            </Button>
+
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              onClick={() => onUnassignDriver(d.id)}
+                            >
+                              Desasignar
+                            </Button>
+                          </Stack>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -576,6 +693,34 @@ async function onUnassignEngineer(userId) {
         )}
         </Stack>
       </Box>
+      <Dialog open={openSkillDialog} onClose={closeEditSkill} maxWidth="xs" fullWidth>
+        <DialogTitle>Modificar skill</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography fontWeight={700}>
+            {skillDriver?.name || "Conductor"}
+          </Typography>
+
+          <TextField
+            fullWidth
+            label="Skill (0-100)"
+            value={skillValue}
+            onChange={(e) => setSkillValue(e.target.value.replace(/\D/g, ""))}
+            margin="normal"
+            inputProps={{ inputMode: "numeric" }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditSkill}>Cancelar</Button>
+          <Button
+            onClick={submitEditSkill}
+            variant="contained"
+            disabled={savingSkill}
+          >
+            {savingSkill ? "Guardando..." : "Guardar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+    
   );
 }

@@ -12,5 +12,10 @@ export function makeUserController(userService) {
       const users = await userService.listEngineersAvailable();
       res.json({ users });
     }),
+    listDriversAvailable: asyncHandler(async (req, res) => {
+      const users = await userService.listDriversAvailable();
+      res.json({ users });
+    }),
+
   };
 }

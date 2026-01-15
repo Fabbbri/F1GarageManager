@@ -276,22 +276,15 @@ export class SqlServerTeamRepository extends TeamRepository {
     }
   }
 
-  async addDriver(teamId, driver) {
+  async addDriver(teamId, { driverId, skill }) {
     const pool = await getSqlPool();
-    try {
-      const result = await pool
-        .request()
-        .input("TeamId", sql.UniqueIdentifier, teamId)
-        .input("DriverId", sql.UniqueIdentifier, driver.id)
-        .input("Name", sql.NVarChar(120), driver.name)
-        .input("Skill", sql.Int, Number(driver.skill ?? 50))
-        .execute("dbo.Team_AddDriver");
+    const result = await pool.request()
+      .input("TeamId", sql.UniqueIdentifier, teamId)
+      .input("DriverId", sql.UniqueIdentifier, driverId)
+      .input("Skill", sql.Int, Number(skill ?? 50))
+      .execute("dbo.Team_AddDriver");
 
-      return mapTeamFromRecordsets(result.recordsets);
-    } catch (e) {
-      if (hasMessage(e, "equipo no encontrado")) return null;
-      throw e;
-    }
+    return mapTeamFromRecordsets(result.recordsets);
   }
 
   async removeDriver(teamId, driverId) {
@@ -310,6 +303,18 @@ export class SqlServerTeamRepository extends TeamRepository {
       throw e;
     }
   }
+
+  async updateDriverSkill(teamId, driverId, skill) {
+    const pool = await getSqlPool();
+    const r = await pool.request()
+      .input("TeamId", sql.UniqueIdentifier, teamId)
+      .input("DriverId", sql.UniqueIdentifier, driverId)
+      .input("Skill", sql.Int, skill)
+      .execute("dbo.Team_UpdateDriverSkill");
+
+    return mapTeamFromRecordsets(r.recordsets);
+  }
+
 
   async addInventoryItem(teamId, item) {
     const pool = await getSqlPool();
