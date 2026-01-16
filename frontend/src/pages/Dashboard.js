@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "../services/auth";
-import { listTeams, getTeam } from "../services/teams";
+import { listTeams, getTeam, getDriverStats } from "../services/teams";
 import { listParts } from "../services/parts";
 import {
   Box,
@@ -83,6 +83,7 @@ export default function Dashboard() {
   const role = session?.role || "—";
   const isAdmin = useMemo(() => role === "ADMIN", [role]);
   const isEngineer = useMemo(() => role === "ENGINEER", [role]);
+  const isDriver = useMemo(() => role === "DRIVER", [role]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,6 +93,9 @@ export default function Dashboard() {
   const [parts, setParts] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
 
+  const [driverTeamId, setDriverTeamId] = useState("");
+  const [driverStats, setDriverStats] = useState(null);
+
   useEffect(() => {
     let alive = true;
 
@@ -99,6 +103,26 @@ export default function Dashboard() {
       setLoading(true);
       setError("");
       try {
+        // DRIVER dashboard
+        if (isDriver) {
+          const tList = await listTeams();
+          if (!alive) return;
+
+          const t = Array.isArray(tList) && tList.length ? tList[0] : null;
+          setDriverTeamId(String(t?.id || ""));
+
+          if (!t?.id || !session?.id) {
+            setDriverStats(null);
+            return;
+          }
+
+          const stats = await getDriverStats(t.id, session.id);
+          if (!alive) return;
+          setDriverStats(stats);
+          return;
+        }
+
+        // ADMIN/ENGINEER dashboard
         if (!(isAdmin || isEngineer)) return;
 
         const [tList, pList] = await Promise.all([listTeams(), listParts()]);
@@ -122,7 +146,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [isAdmin, isEngineer]);
+  }, [isAdmin, isEngineer, isDriver, session?.id]);
 
   useEffect(() => {
     if (!selectedTeamId && teams.length) setSelectedTeamId(teams[0].id);
@@ -211,10 +235,95 @@ export default function Dashboard() {
         {error ? <Alert severity="error">{error}</Alert> : null}
         {loading ? <Typography color="text.secondary">Cargando...</Typography> : null}
 
-        {!loading && !error && !(isAdmin || isEngineer) ? (
-          <Alert severity="info">
-            Dashboard para este rol: próximamente.
-          </Alert>
+        {!loading && !error && isDriver ? (
+          <>
+            <Card>
+              <CardContent>
+                <Typography fontWeight={900} sx={{ mb: 1 }}>Perfil</Typography>
+                <Typography color="text.secondary">
+                  Nombre: <b>{session?.name || "—"}</b>
+                </Typography>
+                <Typography color="text.secondary">
+                  Email: <b>{session?.email || "—"}</b>
+                </Typography>
+              </CardContent>
+            </Card>
+
+            {!driverTeamId ? (
+              <Alert severity="info">No tenés equipo asignado: no hay resultados aún.</Alert>
+            ) : null}
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <Card sx={{ flex: 1 }}>
+                <CardContent>
+                  <Typography color="text.secondary" variant="body2">Carreras</Typography>
+                  <Typography variant="h5" fontWeight={900}>{String(driverStats?.races ?? 0)}</Typography>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ flex: 1 }}>
+                <CardContent>
+                  <Typography color="text.secondary" variant="body2">Puntos totales</Typography>
+                  <Typography variant="h5" fontWeight={900}>{String(driverStats?.totalPoints ?? 0)}</Typography>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ flex: 1 }}>
+                <CardContent>
+                  <Typography color="text.secondary" variant="body2">Mejor posición</Typography>
+                  <Typography variant="h5" fontWeight={900}>{driverStats?.bestPosition ?? "—"}</Typography>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ flex: 1 }}>
+                <CardContent>
+                  <Typography color="text.secondary" variant="body2">Promedio posición</Typography>
+                  <Typography variant="h5" fontWeight={900}>
+                    {Number(driverStats?.avgPosition ?? 0).toFixed(2)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Stack>
+
+            <Card>
+              <CardContent>
+                <Typography fontWeight={900} sx={{ mb: 1 }}>Resultados</Typography>
+                {Array.isArray(driverStats?.results) && driverStats.results.length ? (
+                  <Stack spacing={0.75}>
+                    {driverStats.results.map((r) => (
+                      <Typography
+                        key={r.id || `${r.date}-${r.race}-${r.position}-${r.points}`}
+                        color="text.secondary"
+                      >
+                        • {r.race} • {new Date(r.date).toLocaleDateString()} • pos {r.position} • {r.points} pts
+                      </Typography>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary">No hay resultados registrados.</Typography>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Typography fontWeight={900} sx={{ mb: 1 }}>Estadísticas</Typography>
+                {!driverTeamId ? (
+                  <Typography color="text.secondary">Sin equipo asignado: no hay estadísticas aún.</Typography>
+                ) : !driverStats ? (
+                  <Typography color="text.secondary">No hay estadísticas disponibles aún.</Typography>
+                ) : (
+                  <Stack spacing={0.5}>
+                    <Typography color="text.secondary">Promedio puntos: <b>{Number(driverStats.avgPoints ?? 0).toFixed(2)}</b></Typography>
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
+
+        {!loading && !error && !(isAdmin || isEngineer || isDriver) ? (
+          <Alert severity="info">Dashboard para este rol: próximamente.</Alert>
         ) : null}
 
         {!loading && !error && (isAdmin || isEngineer) ? (

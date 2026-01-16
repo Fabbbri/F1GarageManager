@@ -44,9 +44,25 @@ export class TeamService {
     return await this.teamRepo.list();
   }
 
-  async getById(id) {
+  async getById(id, auth = null) {
     const team = await this.teamRepo.findById(id);
     if (!team) throw this._err(404, "Equipo no encontrado.");
+
+    // DRIVER puede ver solo equipos visibles para él
+    if (auth?.role === "DRIVER" && auth?.userId) {
+      const userId = String(auth.userId);
+
+      // Prefer repo-level visibility (SQL)
+      if (typeof this.teamRepo.listVisibleByUser === "function") {
+        const visible = await this.teamRepo.listVisibleByUser(userId);
+        const ok = (visible || []).some((t) => String(t?.id) === String(team?.id));
+        if (!ok) throw this._err(403, "No autorizado.");
+      } else {
+        // Fallback (memory mode): check membership via drivers array
+        const isMember = (team?.drivers || []).some((d) => String(d?.id) === userId);
+        if (!isMember) throw this._err(403, "No autorizado.");
+      }
+    }
     return team;
   }
 
@@ -204,15 +220,26 @@ export class TeamService {
     return updated;
   }
 
-  async getDriverStats(teamId, driverId) {
-    const team = await this.getById(teamId);
+  async getDriverStats(teamId, driverId, auth = null) {
+    // DRIVER solo puede ver sus propias stats
+    if (auth?.role === "DRIVER" && auth?.userId) {
+      if (String(auth.userId) !== String(driverId)) {
+        throw this._err(403, "No autorizado.");
+      }
+    }
+
+    const team = await this.getById(teamId, auth);
     const driver = (team.drivers || []).find(d => d.id === String(driverId));
     if (!driver) throw this._err(404, "Conductor no encontrado.");
 
-    const results = driver.results || [];
+    const results = Array.isArray(driver.results) ? driver.results : [];
     const races = results.length;
     const avgPosition = races ? results.reduce((s, r) => s + Number(r.position || 0), 0) / races : 0;
     const avgPoints = races ? results.reduce((s, r) => s + Number(r.points || 0), 0) / races : 0;
+
+    const sortedResults = results
+      .slice()
+      .sort((a, b) => String(b?.date || "").localeCompare(String(a?.date || "")));
 
     return {
       driverId: driver.id,
@@ -221,6 +248,7 @@ export class TeamService {
       avgPoints,
       bestPosition: races ? Math.min(...results.map(r => Number(r.position || Infinity))) : null,
       totalPoints: results.reduce((s, r) => s + Number(r.points || 0), 0),
+      results: sortedResults,
     };
   }
 

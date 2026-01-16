@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, CardContent, Typography, Stack, Button, TextField, Alert, DialogActions, Dialog, DialogContent, DialogTitle } from "@mui/material";
+import { Box, Card, CardContent, Typography, Stack, Button, TextField, Alert, DialogActions, Dialog, DialogContent, DialogTitle, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 
 import { getSession } from "../services/auth";
 import { listTeams, createTeam, deleteTeam } from "../services/teams";
@@ -219,23 +219,24 @@ export default function Teams() {
             Equipo: <strong>{selectedTeam?.name || "—"}</strong>
           </Typography>
 
-          <TextField
-            select
-            fullWidth
-            label="Engineer"
-            value={selectedEngineer}
-            onChange={(e) => setSelectedEngineer(e.target.value)}
-            SelectProps={{ native: true }}
-          >
-            <option value="" disabled>
-              Seleccionar...
-            </option>
-            {(engineers || []).filter(Boolean).map((u) => (
-              <option key={u?.id} value={u?.id}>
-                {u?.name || u?.email || u?.username || u?.id}
-              </option>
-            ))}
-          </TextField>
+          <FormControl fullWidth>
+            <InputLabel id="assign-engineer-select-label">Engineer</InputLabel>
+            <Select
+              labelId="assign-engineer-select-label"
+              label="Engineer"
+              value={selectedEngineer}
+              onChange={(e) => setSelectedEngineer(e.target.value)}
+            >
+              <MenuItem value="" disabled>
+                Seleccionar...
+              </MenuItem>
+              {(engineers || []).filter(Boolean).map((u) => (
+                <MenuItem key={u?.id} value={u?.id}>
+                  {u?.name || u?.email || u?.username || u?.id}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeAssignDialog}>Cancelar</Button>

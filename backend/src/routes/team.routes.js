@@ -5,8 +5,9 @@ export function makeTeamRoutes(teamController) {
   const r = Router();
 
   // lectura (Admin/Engineer)
-  r.get("/", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.list);
-  r.get("/:id", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.getById);
+  // Nota: DRIVER puede leer *solo* sus equipos; la validación fina se hace en service.
+  r.get("/", requireAuth, requireRole("ADMIN", "ENGINEER", "DRIVER"), teamController.list);
+  r.get("/:id", requireAuth, requireRole("ADMIN", "ENGINEER", "DRIVER"), teamController.getById);
 
   // CRUD equipo (Admin)
   r.post("/", requireAuth, requireRole("ADMIN"), teamController.create);
@@ -25,7 +26,8 @@ export function makeTeamRoutes(teamController) {
   r.delete("/:id/drivers/:driverId", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.removeDriver);
 
   r.post("/:id/drivers/:driverId/results", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.addDriverResult);
-  r.get("/:id/drivers/:driverId/stats", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.getDriverStats);
+  // DRIVER puede ver *solo* sus stats
+  r.get("/:id/drivers/:driverId/stats", requireAuth, requireRole("ADMIN", "ENGINEER", "DRIVER"), teamController.getDriverStats);
 
   r.post("/:id/store/purchase", requireAuth, requireRole("ADMIN", "ENGINEER"), teamController.purchasePart);
 

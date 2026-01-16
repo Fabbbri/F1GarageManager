@@ -5,7 +5,7 @@ export function makeTeamController(teamService) {
     list: asyncHandler(async (req, res) =>
       res.json({ teams: await teamService.list(req.auth) })
     ),
-    getById: asyncHandler(async (req, res) => res.json({ team: await teamService.getById(req.params.id) })),
+    getById: asyncHandler(async (req, res) => res.json({ team: await teamService.getById(req.params.id, req.auth) })),
     create: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.create(req.body) })),
     update: asyncHandler(async (req, res) => res.json({ team: await teamService.update(req.params.id, req.body) })),
     remove: asyncHandler(async (req, res) => { await teamService.remove(req.params.id); res.status(204).send(); }),
@@ -21,7 +21,7 @@ export function makeTeamController(teamService) {
     removeDriver: asyncHandler(async (req, res) => res.json({ team: await teamService.removeDriver(req.params.id, req.params.driverId) })),
 
     addDriverResult: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.addDriverResult(req.params.id, req.params.driverId, req.body) })),
-    getDriverStats: asyncHandler(async (req, res) => res.json({ stats: await teamService.getDriverStats(req.params.id, req.params.driverId) })),
+    getDriverStats: asyncHandler(async (req, res) => res.json({ stats: await teamService.getDriverStats(req.params.id, req.params.driverId, req.auth) })),
 
     purchasePart: asyncHandler(async (req, res) => res.status(201).json({ team: await teamService.purchasePart(req.params.id, req.body) })),
 

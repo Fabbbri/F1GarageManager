@@ -523,10 +523,66 @@ export class SqlServerTeamRepository extends TeamRepository {
 
 async listVisibleByUser(userId) {
   const pool = await getSqlPool();
-  const r = await pool.request()
+
+  const roleRes = await pool
+    .request()
     .input("UserId", sql.UniqueIdentifier, userId)
-    .execute("dbo.Team_ListVisibleByUser");
-  return (r.recordset || []).map(mapTeamFromListRow).filter(Boolean);
+    .query("SELECT Role FROM dbo.[USER] WHERE Id = @UserId");
+
+  const role = String(roleRes.recordset?.[0]?.Role || "").toUpperCase();
+  if (!role) return [];
+
+  // Admin: all teams
+  if (role === "ADMIN") {
+    const r = await pool.request().query(`
+      SELECT
+        t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+        b.Total AS BudgetTotal,
+        b.Spent AS BudgetSpent
+      FROM dbo.TEAM t
+      LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
+      ORDER BY t.CreatedAt DESC
+    `);
+    return (r.recordset || []).map(mapTeamFromListRow).filter(Boolean);
+  }
+
+  // Engineer: assigned team via TEAM_ENGINEER
+  if (role === "ENGINEER") {
+    const r = await pool
+      .request()
+      .input("UserId", sql.UniqueIdentifier, userId)
+      .query(`
+        SELECT
+          t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+          b.Total AS BudgetTotal,
+          b.Spent AS BudgetSpent
+        FROM dbo.TEAM_ENGINEER te
+        JOIN dbo.TEAM t ON t.Id = te.TeamId
+        LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
+        WHERE te.UserId = @UserId
+      `);
+    return (r.recordset || []).map(mapTeamFromListRow).filter(Boolean);
+  }
+
+  // Driver: teams via TEAM_DRIVER bridge
+  if (role === "DRIVER") {
+    const r = await pool
+      .request()
+      .input("UserId", sql.UniqueIdentifier, userId)
+      .query(`
+        SELECT DISTINCT
+          t.Id, t.Name, t.Country, t.CreatedAt, t.UpdatedAt,
+          b.Total AS BudgetTotal,
+          b.Spent AS BudgetSpent
+        FROM dbo.TEAM_DRIVER td
+        JOIN dbo.TEAM t ON t.Id = td.TeamId
+        LEFT JOIN dbo.TEAM_BUDGET b ON b.TeamId = t.Id
+        WHERE td.UserId = @UserId
+      `);
+    return (r.recordset || []).map(mapTeamFromListRow).filter(Boolean);
+  }
+
+  return [];
 }
 
 async assignEngineer(teamId, userId) {

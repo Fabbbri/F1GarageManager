@@ -48,10 +48,18 @@ export default function TeamDetail() {
   const { id } = useParams();
   const session = getSession();
   const isAdmin = useMemo(() => session?.role === "ADMIN", [session]);
+  const isEngineer = useMemo(() => session?.role === "ENGINEER", [session]);
   const canEdit = useMemo(() => ["ADMIN", "ENGINEER"].includes(session?.role), [session]);
 
   const [team, setTeam] = useState(null);
-  const [tab, setTab] = useState(0);
+  const TAB_BUDGET = "budget";
+  const TAB_SPONSORS = "sponsors";
+  const TAB_INVENTORY = "inventory";
+  const TAB_CARS = "cars";
+  const TAB_ENGINEERS = "engineers";
+  const TAB_DRIVERS = "drivers";
+
+  const [tab, setTab] = useState(TAB_BUDGET);
   const [error, setError] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -103,13 +111,23 @@ export default function TeamDetail() {
 
   useEffect(() => { reload(); }, [id]);
   useEffect(() => {
+    // Solo ADMIN/ENGINEER pueden ver ingenieros del equipo
+    if (tab !== TAB_ENGINEERS) return;
     if (!team?.id) return;
+    if (!(isAdmin || isEngineer)) return;
+
     loadTeamEngineers(team.id);
     loadEngineersCatalog();
-  }, [team?.id]);
+  }, [tab, team?.id, isAdmin, isEngineer]);
   useEffect(() => {
-    if (tab === 5) loadAvailableDrivers();
+    if (tab === TAB_DRIVERS) loadAvailableDrivers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  useEffect(() => {
+    // Si el usuario no tiene permiso para ingenieros, evita quedar "parqueado" en ese tab.
+    if (tab === TAB_ENGINEERS && !(isAdmin || isEngineer)) setTab(TAB_DRIVERS);
+  }, [tab, isAdmin, isEngineer]);
 
   if (loading)
     return (
@@ -286,6 +304,9 @@ async function loadTeamEngineers(teamId) {
     const res = await listTeamEngineers(teamId); // /teams/:id/engineers
     const arr = Array.isArray(res?.engineers) ? res.engineers : (Array.isArray(res) ? res : []);
     setTeamEngineers(arr.filter(Boolean));
+    } catch (e) {
+      setTeamEngineers([]);
+      setError(e?.message || "Error cargando engineers del equipo");
   } finally {
     setLoadingTeamEngineers(false);
   }
@@ -330,17 +351,17 @@ async function onUnassignEngineer(userId) {
         <Card>
           <CardContent>
             <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-              <Tab label="Presupuesto" />
-              <Tab label="Patrocinadores" />
-              <Tab label="Inventario" />
-              <Tab label="Carros" />
-              <Tab label="Ingenieros" />
-              <Tab label="Conductores" />
+              <Tab value={TAB_BUDGET} label="Presupuesto" />
+              <Tab value={TAB_SPONSORS} label="Patrocinadores" />
+              <Tab value={TAB_INVENTORY} label="Inventario" />
+              <Tab value={TAB_CARS} label="Carros" />
+              {(isAdmin || isEngineer) ? <Tab value={TAB_ENGINEERS} label="Ingenieros" /> : null}
+              <Tab value={TAB_DRIVERS} label="Conductores" />
             </Tabs>
           </CardContent>
         </Card>
 
-        {tab === 0 && (
+        {tab === TAB_BUDGET && (
           <Section title="Presupuesto">
             <Stack spacing={1}>
               <Typography color="text.secondary">
@@ -358,7 +379,7 @@ async function onUnassignEngineer(userId) {
           </Section>
         )}
 
-        {tab === 1 && (
+        {tab === TAB_SPONSORS && (
           <Section title="Patrocinadores">
             <Stack spacing={2}>
               {/*<Box component="form" onSubmit={onAddSponsor}>
@@ -403,7 +424,7 @@ async function onUnassignEngineer(userId) {
           </Section>
         )}
 
-        {tab === 2 && (
+        {tab === TAB_INVENTORY && (
           <Section title="Inventario">
             <Stack spacing={2}>
               <Typography color="text.secondary">
@@ -439,7 +460,7 @@ async function onUnassignEngineer(userId) {
           </Section>
         )}
 
-        {tab === 3 && (
+        {tab === TAB_CARS && (
           <Section title="Carros (máximo 2)">
             <Stack spacing={2}>
               <Alert severity="info">
@@ -510,7 +531,7 @@ async function onUnassignEngineer(userId) {
           </Section>
         )}
 
-        {tab === 5 && (
+        {tab === TAB_DRIVERS && (
           <Section title="Conductores">
             <Stack spacing={2}>
 
@@ -522,21 +543,24 @@ async function onUnassignEngineer(userId) {
                     </Typography>
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                      <TextField
-                        select
-                        fullWidth
-                        label="Conductor disponible"
-                        value={selectedDriver}
-                        onChange={(e) => setSelectedDriver(e.target.value)}
-                        SelectProps={{ native: true }}
-                      >
-                        <option value="" disabled></option>
-                        {(availableDrivers || []).filter(Boolean).map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name || u.email || u.id}
-                          </option>
-                        ))}
-                      </TextField>
+                      <FormControl fullWidth>
+                        <InputLabel id="available-driver-select-label">Conductor disponible</InputLabel>
+                        <Select
+                          labelId="available-driver-select-label"
+                          label="Conductor disponible"
+                          value={selectedDriver}
+                          onChange={(e) => setSelectedDriver(e.target.value)}
+                        >
+                          <MenuItem value="" disabled>
+                            Seleccionar...
+                          </MenuItem>
+                          {(availableDrivers || []).filter(Boolean).map((u) => (
+                            <MenuItem key={u.id} value={u.id}>
+                              {u.name || u.email || u.id}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
 
                       <TextField
                         label="Skill (0-100)"
@@ -602,7 +626,7 @@ async function onUnassignEngineer(userId) {
             </Stack>
           </Section>
         )}
-        {tab === 4 && (
+        {tab === TAB_ENGINEERS && (
           <Section title="Ingenieros">
             <Stack spacing={2}>
 
@@ -614,21 +638,24 @@ async function onUnassignEngineer(userId) {
                     </Typography>
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                      <TextField
-                        select
-                        fullWidth
-                        label="Ingeniero"
-                        value={selectedEngineer}
-                        onChange={(e) => setSelectedEngineer(e.target.value)}
-                        SelectProps={{ native: true }}
-                      >
-                        <option value="" disabled></option>
-                        {(engineers || []).filter(Boolean).map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name || u.email || u.id}
-                          </option>
-                        ))}
-                      </TextField>
+                      <FormControl fullWidth>
+                        <InputLabel id="team-engineer-select-label">Ingeniero</InputLabel>
+                        <Select
+                          labelId="team-engineer-select-label"
+                          label="Ingeniero"
+                          value={selectedEngineer}
+                          onChange={(e) => setSelectedEngineer(e.target.value)}
+                        >
+                          <MenuItem value="" disabled>
+                            Seleccionar...
+                          </MenuItem>
+                          {(engineers || []).filter(Boolean).map((u) => (
+                            <MenuItem key={u.id} value={u.id}>
+                              {u.name || u.email || u.id}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
 
                       <Button
                         variant="contained"
