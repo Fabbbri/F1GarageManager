@@ -103,25 +103,64 @@ Si algo falla en la UI, lo más útil es pegar el error del backend (consola don
 1. Abrí **SQL Server Management Studio** y conectate a tu instancia (ej: `localhost\SQLEXPRESS`).
 2. (Si no existe) Crear base de datos:
 	- Click derecho en **Databases** → **New Database...** → nombre: `F1GarageManager` → OK.
-3. Ejecutar el script de usuarios:
+
+Opcional (script):
+```sql
+IF DB_ID(N'F1GarageManager') IS NULL
+  CREATE DATABASE F1GarageManager;
+GO
+```
+
+3. (Recomendado) Crear el login/usuario de la app (`f1app`) y permisos mínimos:
+```sql
+USE master;
+GO
+CREATE LOGIN f1app WITH PASSWORD = 'UnaPasswordFuerte_123!';
+GO
+
+USE F1GarageManager;
+GO
+CREATE USER f1app FOR LOGIN f1app;
+GO
+
+EXEC sp_addrolemember 'db_datareader', 'f1app';
+EXEC sp_addrolemember 'db_datawriter', 'f1app';
+GO
+
+-- Permite ejecutar todos los SPs dentro del esquema dbo
+GRANT EXECUTE ON SCHEMA::dbo TO f1app;
+GO
+```
+
+4. Ejecutar el script de usuarios:
 	- Abrí el archivo `database/schema/001_users.sql` en SSMS.
 	- Seleccioná la BD `F1GarageManager` en el desplegable (arriba) o ejecutá: `USE F1GarageManager;`.
-	- Ejecutá (F5). Esto crea la tabla `dbo.Users` y stored procedures.
+	- Ejecutá (F5). Esto crea la tabla `dbo.[USER]` y stored procedures.
 
-4. Ejecutar el script de equipos (relacional, sin JSON):
+5. Ejecutar el script de sponsors:
+	- Abrí el archivo `database/schema/002_sponsors_catalog.sql`.
+	- Seleccioná la BD `F1GarageManager`.
+	- Ejecutá (F5). Esto crea `dbo.SPONSOR` y SPs `dbo.Sponsor_*`.
+
+6. Ejecutar el script de equipos (relacional, sin JSON):
 	- Abrí el archivo `database/schema/003_teams_relational_nogo.sql` en SSMS.
 	- Seleccioná la BD `F1GarageManager`.
-	- Ejecutá (F5). Esto crea/ajusta tablas `dbo.Teams` + tablas hijas y stored procedures `dbo.Team_*`.
+	- Ejecutá (F5). Esto crea/ajusta tablas `dbo.TEAM` + tablas hijas y stored procedures `dbo.Team_*`.
 
-5. Ejecutar el script de catálogo de tienda (Parts):
+7. Ejecutar el script de catálogo de tienda (Parts):
 	- Abrí el archivo `database/schema/004_parts_catalog.sql`.
 	- Seleccioná la BD `F1GarageManager`.
 	- Ejecutá (F5). Esto crea/ajusta `dbo.PART` (catálogo) + `dbo.STORE` (listing) y los stored procedures `dbo.Part_*`.
 
-6. Ejecutar el script de compra transaccional (auditoría + atomicidad):
+8. Ejecutar el script de compra transaccional (auditoría + atomicidad):
 	- Abrí el archivo `database/schema/005_store_purchase_transaction.sql`.
 	- Seleccioná la BD `F1GarageManager`.
 	- Ejecutá (F5). Esto crea/ajusta `dbo.TEAM_STORE_PURCHASE` y el SP `dbo.Store_PurchasePart`.
+
+9. (Opcional) Si vas a usar autenticación por **sesiones con cookies** (store persistente):
+	- Abrí el archivo `database/schema/010_session_store.sql`.
+	- Seleccioná la BD `F1GarageManager`.
+	- Ejecutá (F5). Esto crea la tabla `dbo.[SESSION]` para persistir sesiones.
 
 > Nota: usamos la versión **nogo** porque evita `GO` y `THROW`, que en algunos entornos/ejecutores causan errores de sintaxis.
 
@@ -172,7 +211,7 @@ Debe responder algo como:
 ### 5) Probar registro y ver datos en la tabla
 1. Registrate desde el frontend (pantalla **Signup**) o por API: `POST /api/auth/signup`.
 2. En SSMS:
-	- Object Explorer → `F1GarageManager` → **Tables** → `dbo.Users`
+	- Object Explorer → `F1GarageManager` → **Tables** → `dbo.[USER]`
 	- Click derecho → **Select Top 1000 Rows**
 
 > Tip: si SSMS muestra errores de IntelliSense pero el `SELECT` funciona, usá: **Edit → IntelliSense → Refresh Local Cache**.
@@ -197,11 +236,12 @@ IF DB_ID(N'F1GarageManager') IS NULL
 GO
 ```
 3. Ejecutar los scripts:
-	- Abrir `database/schema/001_users.sql`
-	- Ejecutar (F5) apuntando a la BD `F1GarageManager`
-	- Si van a persistir equipos: abrir `database/schema/003_teams_relational_nogo.sql` y ejecutar (F5)
-	- Para catálogo de tienda: abrir `database/schema/004_parts_catalog.sql` y ejecutar (F5)
-	- Para compra transaccional + auditoría: abrir `database/schema/005_store_purchase_transaction.sql` y ejecutar (F5)
+	- Abrir `database/schema/001_users.sql` y ejecutar (F5)
+	- Abrir `database/schema/002_sponsors_catalog.sql` y ejecutar (F5)
+	- Abrir `database/schema/003_teams_relational_nogo.sql` y ejecutar (F5)
+	- Abrir `database/schema/004_parts_catalog.sql` y ejecutar (F5)
+	- Abrir `database/schema/005_store_purchase_transaction.sql` y ejecutar (F5)
+	- (Opcional, si usás autenticación por sesiones con cookies y `SESSION_STORE=sqlserver`) abrir `database/schema/010_session_store.sql` y ejecutar (F5)
 
 > Si corrés los scripts con `f1app` y te salen errores de `CREATE/ALTER` o de columnas que “no existen”, conectate con tu usuario admin y volvélos a ejecutar.
 
@@ -274,9 +314,28 @@ DB_TRUST_SERVER_CERTIFICATE=true
 Si la BD `F1GarageManager` **ya existe** y solo querés actualizarla a la versión actual del esquema (STORE + PART normalizado), corré los scripts en este orden (en SSMS, apuntando a `F1GarageManager`):
 
 1. `database/schema/001_users.sql` (solo si querés login/signup en BD; si ya lo tenés, lo podés omitir)
-2. `database/schema/003_teams_relational_nogo.sql` (teams + inventario + SPs `dbo.Team_*`)
-3. `database/schema/004_parts_catalog.sql` (crea/ajusta `dbo.PART` + `dbo.STORE` y SPs `dbo.Part_*`)
-4. `database/schema/005_store_purchase_transaction.sql` (crea/ajusta `dbo.TEAM_STORE_PURCHASE` y `dbo.Store_PurchasePart`)
+2. `database/schema/002_sponsors_catalog.sql` (catálogo `dbo.SPONSOR` + SPs `dbo.Sponsor_*`)
+3. `database/schema/003_teams_relational_nogo.sql` (teams + inventario + SPs `dbo.Team_*`)
+4. `database/schema/004_parts_catalog.sql` (crea/ajusta `dbo.PART` + `dbo.STORE` y SPs `dbo.Part_*`)
+5. `database/schema/005_store_purchase_transaction.sql` (crea/ajusta `dbo.TEAM_STORE_PURCHASE` y `dbo.Store_PurchasePart`)
+6. (Opcional, si usás autenticación por sesiones con cookies y `SESSION_STORE=sqlserver`) `database/schema/010_session_store.sql`
+
+### ✅ Si tu base es versión vieja (te “sirvió” este orden) No es seguro pero creo que asi es
+Si venís de una base vieja (tablas con nombres anteriores y/o estructura distinta), este orden suele funcionar bien:
+
+1. `database/schema/007_rename_tables.sql`
+2. `database/schema/009_Drivers_patch.sql`
+3. `database/schema/008_Sponsors_patch.sql`
+4. `database/schema/001_users.sql`
+5. `database/schema/002_sponsors_catalog.sql`
+6. `database/schema/003_teams_relational_nogo.sql`
+7. `database/schema/004_parts_catalog.sql`
+8. `database/schema/005_store_purchase_transaction.sql`
+9. (Opcional, si usás autenticación por sesiones con cookies y `SESSION_STORE=sqlserver`) `database/schema/010_session_store.sql`
+
+> Importante: el `009_Drivers_patch.sql` borra `dbo.TEAM_DRIVER`, así que el `003_teams_relational_nogo.sql` debe correrse después para recrearla.
+
+> Nota: el `008_Sponsors_patch.sql` requiere que ya existan `dbo.TEAM_EARNINGS` (lo crea el `003`) y `dbo.SPONSOR` (lo crea el `002`). Por eso va **después** de `002` + `003`.
 
 Opcional (solo si venís de una versión vieja y tenés inventario repetido/duplicado):
 - `database/schema/006_fix_inventory_stacking.sql` (corrélo **una sola vez**)

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { getSession, logout } from "../services/auth";
+import { getSession, serverLogout } from "../services/auth";
 import {
   Box,
   Drawer,
@@ -63,8 +63,8 @@ export default function AppShell() {
   const [desktopHover, setDesktopHover] = useState(false);
   const navigate = useNavigate();
 
-  const onLogout = () => {
-    logout();
+  const onLogout = async () => {
+    await serverLogout();
     navigate("/login");
   };
 

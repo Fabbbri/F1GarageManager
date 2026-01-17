@@ -1,16 +1,47 @@
 import express from "express";
 import cors from "cors";
+import session from "express-session";
 import { env } from "./config/env.js";
 import routes from "./routes/index.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { asyncHandler } from "./utils/asyncHandler.js";
 import { getSqlPool } from "./db/sqlserver.js";
+import { SqlServerSessionStore } from "./db/sqlserver.session-store.js";
 
 export function createApp() {
   const app = express();
 
+  // Needed when running behind a proxy (Render/Azure/nginx) to support Secure cookies.
+  app.set("trust proxy", 1);
+
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   app.use(express.json());
+
+  const sameSite = ["lax", "strict", "none"].includes(env.session.cookieSameSite)
+    ? env.session.cookieSameSite
+    : "lax";
+
+  const sessionStore =
+    String(env.session.store).toLowerCase() === "sqlserver"
+      ? new SqlServerSessionStore({ ttlMs: env.session.ttlMs })
+      : undefined;
+
+  app.use(
+    session({
+      name: env.session.cookieName,
+      secret: env.session.secret,
+      resave: false,
+      saveUninitialized: false,
+      rolling: env.session.rolling,
+      store: sessionStore,
+      cookie: {
+        httpOnly: true,
+        secure: Boolean(env.session.cookieSecure),
+        sameSite,
+        maxAge: env.session.ttlMs,
+      },
+    })
+  );
 
   app.get("/", (req, res) => {
     res.json({

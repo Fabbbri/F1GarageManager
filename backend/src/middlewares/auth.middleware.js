@@ -1,6 +1,14 @@
 import { verifyToken } from "../services/token.service.js";
 
 export function requireAuth(req, res, next) {
+  // Prefer session auth (cookie-based)
+  const sessAuth = req.session?.auth;
+  if (sessAuth?.userId) {
+    req.auth = { userId: sessAuth.userId, role: sessAuth.role };
+    return next();
+  }
+
+  // Backward compatibility: Bearer token
   const header = req.headers.authorization || "";
   const [type, token] = header.split(" ");
 

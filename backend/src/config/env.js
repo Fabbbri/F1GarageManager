@@ -2,10 +2,27 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const env = {
+  nodeEnv: process.env.NODE_ENV || "development",
   port: process.env.PORT || 4000,
   jwtSecret: process.env.JWT_SECRET || "dev_secret",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "2h",
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
+
+  // Allows self-signup as ADMIN (NOT recommended). If false, ADMIN signup is only allowed when no admin exists yet.
+  allowAdminSignup: String(process.env.ALLOW_ADMIN_SIGNUP || "").toLowerCase() === "true",
+
+  // Session auth (cookie-based)
+  session: {
+    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || "dev_session_secret",
+    ttlMs: process.env.SESSION_TTL_MS ? Number(process.env.SESSION_TTL_MS) : 1000 * 60 * 60 * 2,
+    cookieName: process.env.SESSION_COOKIE_NAME || "f1gm.sid",
+    cookieSameSite: (process.env.SESSION_SAMESITE || "lax").toLowerCase(),
+    cookieSecure:
+      (process.env.SESSION_SECURE || "").toLowerCase() === "true" ||
+      String(process.env.NODE_ENV || "").toLowerCase() === "production",
+    store: (process.env.SESSION_STORE || "sqlserver").toLowerCase(),
+    rolling: (process.env.SESSION_ROLLING || "true").toLowerCase() === "true",
+  },
 
   // Which user repository to use: "memory" | "sqlserver"
   userRepository: process.env.USER_REPOSITORY || "memory",

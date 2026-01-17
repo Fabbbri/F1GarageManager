@@ -4,4 +4,7 @@ export class UserRepository {
   async findById(id) { throw new Error("Not implemented"); }
   async create(user) { throw new Error("Not implemented"); }
   async list() { throw new Error("Not implemented"); }
+
+  // Returns true if there is at least one ADMIN user.
+  async hasAnyAdmin() { throw new Error("Not implemented"); }
 }

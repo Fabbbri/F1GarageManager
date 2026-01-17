@@ -30,4 +30,8 @@ export class InMemoryUserRepository extends UserRepository {
   async list() {
     return Array.from(this.byId.values());
   }
+
+  async hasAnyAdmin() {
+    return Array.from(this.byId.values()).some((u) => String(u.role).toUpperCase() === "ADMIN");
+  }
 }

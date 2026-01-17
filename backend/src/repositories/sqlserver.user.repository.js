@@ -117,5 +117,15 @@ export class SqlServerUserRepository extends UserRepository {
       role: u.Role ?? "",
     }));
   }
+
+  async hasAnyAdmin() {
+    const pool = await getSqlPool();
+    const result = await pool
+      .request()
+      .input("Role", sql.NVarChar(20), "ADMIN")
+      .query("SELECT TOP (1) 1 AS ok FROM dbo.[USER] WHERE Role = @Role;");
+
+    return (result.recordset || []).length > 0;
+  }
 }
 
