@@ -8,6 +8,12 @@ export function makeUserRoutes(userController) {
   r.get("/", requireAuth, requireRole("ADMIN"), userController.list);
   r.get("/engineers/available", requireAuth, requireRole("ADMIN"), userController.listEngineersAvailable);
   r.get("/drivers/available", requireAuth, requireRole("ADMIN"), userController.listDriversAvailable);
+  r.get(
+    "/drivers/finalized",
+    requireAuth,
+    requireRole("ADMIN"),
+    userController.listDriversFinalized
+  );
 
 
   

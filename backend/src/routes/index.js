@@ -31,6 +31,19 @@ import { SponsorController } from "../controllers/sponsor.controller.js";
 import { SponsorService } from "../services/sponsor.service.js";
 import { SqlServerSponsorRepository } from "../repositories/sqlserver.sponsor.repository.js";
 
+// TRACKS
+import { makeTrackRoutes } from "./track.routes.js";
+import { makeTrackController } from "../controllers/track.controller.js";
+import { TrackService } from "../services/track.service.js";
+import { SqlServerTrackRepository } from "../repositories/sqlserver.track.repository.js";
+
+// SIMULATIONS
+import { makeSimulationRoutes } from "./simulation.routes.js";
+import { makeSimulationController } from "../controllers/simulation.controller.js";
+import { SimulationService } from "../services/simulation.service.js";
+import { SqlServerSimulationRepository } from "../repositories/sqlserver.simulation.repository.js";
+
+
 const router = Router();
 
 // AUTH
@@ -124,5 +137,20 @@ const teamRepo =
 const teamService = new TeamService(teamRepo, partRepo);
 const teamController = makeTeamController(teamService);
 router.use("/teams", makeTeamRoutes(teamController));
+
+// TRACKS
+const trackRepo = new SqlServerTrackRepository();
+const trackService = new TrackService(trackRepo);
+const trackController = makeTrackController(trackService);
+router.use("/tracks", makeTrackRoutes(trackController));
+
+// SIMULATIONS
+const simRepo = new SqlServerSimulationRepository();
+const simService = new SimulationService(simRepo);
+const simController = makeSimulationController(simService);
+router.use("/simulations", makeSimulationRoutes(simController));
+
+
+
 
 export default router;

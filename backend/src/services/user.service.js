@@ -14,6 +14,9 @@ export class UserService {
   async listDriversAvailable() {
     return await this.userRepo.listDriversAvailable();
   }
+  async listDriversFinalized() {
+    return await this.userRepo.listDriversFinalized();
+  }
 
   
 }
@@ -21,4 +24,5 @@ export class UserService {
 export async function listEngineers() {
   return await handle(await fetch(`${API_URL}/users?role=ENGINEER`, { headers: headers() }));
 }
+
 

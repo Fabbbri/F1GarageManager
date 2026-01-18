@@ -8,6 +8,7 @@ import Teams from "../pages/Teams";
 import Store from "../pages/Store";
 import Assembly from "../pages/Assembly";
 import Sponsors from "../pages/Sponsors";
+import Races from "../pages/Races";
 
 import ProtectedRoute from "../components/ProtectedRoute";
 import AppShell from "../components/AppShell";
@@ -41,6 +42,7 @@ export default function AppRoutes() {
         <Route path="/store" element={isDriver ? <Navigate to="/dashboard" replace /> : <Store />} />
         <Route path="/teams/:id" element={isDriver ? <Navigate to="/dashboard" replace /> : <TeamDetail />} />
         <Route path="sponsors" element={isDriver ? <Navigate to="/dashboard" replace /> : <Sponsors />} />
+        <Route path="races" element={isDriver ? <Navigate to="/dashboard" replace /> : <Races />} />
       </Route>
 
       <Route path="*" element={<div style={{ padding: 24 }}>404</div>} />

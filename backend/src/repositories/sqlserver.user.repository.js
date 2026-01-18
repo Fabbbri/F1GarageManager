@@ -127,5 +127,16 @@ export class SqlServerUserRepository extends UserRepository {
 
     return (result.recordset || []).length > 0;
   }
+
+  async listDriversFinalized() {
+    const pool = await getSqlPool();
+    const result = await pool.request().execute("dbo.User_ListDriversFinalized");
+    return (result.recordset || []).map((r) => ({
+      id: String(r.Id),
+      name: r.Name,
+      email: r.Email,
+      role: r.Role,
+    }));
+  }
 }
 

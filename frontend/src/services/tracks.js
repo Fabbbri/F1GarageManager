@@ -17,31 +17,35 @@ async function handle(res) {
   return data;
 }
 
-export async function listEngineers() {
+export async function listTracks({ onlyActive = true } = {}) {
+  const qs = new URLSearchParams();
+  qs.set("onlyActive", onlyActive ? "1" : "0");
+
   return await handle(
-    await fetch(`${API_URL}/users?role=ENGINEER&unassigned=1`, {
+    await fetch(`${API_URL}/tracks?${qs.toString()}`, {
       headers: headers(),
       credentials: "include",
     })
   );
 }
 
-export async function listEngineersAvailable() {
+export async function createTrack(track) {
   return await handle(
-    await fetch(`${API_URL}/users/engineers/available`, {
+    await fetch(`${API_URL}/tracks`, {
+      method: "POST",
+      headers: headers(),
+      credentials: "include",
+      body: JSON.stringify(track),
+    })
+  );
+}
+
+export async function softDeleteTrack(id) {
+  return await handle(
+    await fetch(`${API_URL}/tracks/${id}`, {
+      method: "DELETE",
       headers: headers(),
       credentials: "include",
     })
   );
-}
-export async function listDriversAvailable() {
-  return await handle(
-    await fetch(`${API_URL}/users/drivers/available`, {
-      headers: headers(),
-      credentials: "include",
-    })
-  );
-}
-export async function listDriversFinalized() {
-  return await handle(await fetch(`${API_URL}/users/drivers/finalized`, { headers: headers(), credentials: "include", }));
 }

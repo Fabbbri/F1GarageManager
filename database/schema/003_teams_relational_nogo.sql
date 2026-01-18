@@ -1333,6 +1333,26 @@ BEGIN
 END';
 EXEC sys.sp_executesql @sql;
 
+-- User_ListDriversFinalized (Drivers que están en un carro finalizado)
+SET @sql = N'CREATE OR ALTER PROCEDURE dbo.User_ListDriversFinalized
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  SELECT DISTINCT
+    u.Id,
+    u.Name,
+    u.Email,
+    u.Role
+  FROM dbo.[USER] u
+  JOIN dbo.TEAM_CAR c
+    ON c.DriverId = u.Id
+   AND c.IsFinalized = 1
+  WHERE u.Role = ''DRIVER''
+  ORDER BY u.Name ASC;
+END';
+EXEC sys.sp_executesql @sql;
+
 -- Team_UpdateDriverSkill
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Team_UpdateDriverSkill
   @TeamId UNIQUEIDENTIFIER,
