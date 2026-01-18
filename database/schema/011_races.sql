@@ -132,7 +132,6 @@ EXEC sys.sp_executesql @sql;
 
 -- Track_Create
 SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Track_Create
-  @Id UNIQUEIDENTIFIER,
   @Name NVARCHAR(120),
   @DistanceKm DECIMAL(10,2),
   @Curves INT,
@@ -140,6 +139,8 @@ SET @sql = N'CREATE OR ALTER PROCEDURE dbo.Track_Create
 AS
 BEGIN
   SET NOCOUNT ON;
+
+  DECLARE @Id UNIQUEIDENTIFIER = NEWID();
 
   IF @Name IS NULL OR LTRIM(RTRIM(@Name)) = ''''
   BEGIN RAISERROR(''Nombre requerido.'', 16, 1); RETURN; END
@@ -164,6 +165,7 @@ BEGIN
   WHERE Id = @Id;
 END';
 EXEC sys.sp_executesql @sql;
+
 
 
 -- Track_SoftDelete (IsActive = 0)
