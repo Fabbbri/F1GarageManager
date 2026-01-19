@@ -181,8 +181,8 @@ export default function CarSpecsDialog({ open, onClose, result }) {
                 Cálculos
               </Typography>
               <Stack direction="row" flexWrap="wrap" sx={{ gap: 1.2 }}>
-                <Chip label={`Vrecta: ${fmt(speeds.VRecta, 2)} s`} />
-                <Chip label={`Vcurva: ${fmt(speeds.VCurva, 2)} s`} />
+                <Chip label={`Vrecta: ${fmt(speeds.VRecta, 2)} km/h`} />
+                <Chip label={`Vcurva: ${fmt(speeds.VCurva, 2)} km/h`} />
                 <Chip label={`Penalización: ${fmt(speeds.PenaltySeconds, 0)} s`} />
                 <Chip label={`Tiempo total: ${fmt(timeSec, 0)} s`} />
               </Stack>
