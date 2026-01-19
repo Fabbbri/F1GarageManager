@@ -36,11 +36,11 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/teams" element={isDriver ? <Navigate to="/dashboard" replace /> : <Teams />} />
-        <Route path="/assembly" element={isDriver ? <Navigate to="/dashboard" replace /> : <Assembly />} />
-        <Route path="/store" element={isDriver ? <Navigate to="/dashboard" replace /> : <Store />} />
-        <Route path="/teams/:id" element={isDriver ? <Navigate to="/dashboard" replace /> : <TeamDetail />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="teams" element={isDriver ? <Navigate to="/dashboard" replace /> : <Teams />} />
+        <Route path="assembly" element={isDriver ? <Navigate to="/dashboard" replace /> : <Assembly />} />
+        <Route path="store" element={isDriver ? <Navigate to="/dashboard" replace /> : <Store />} />
+        <Route path="teams/:id" element={isDriver ? <Navigate to="/dashboard" replace /> : <TeamDetail />} />
         <Route path="sponsors" element={isDriver ? <Navigate to="/dashboard" replace /> : <Sponsors />} />
         <Route path="races" element={isDriver ? <Navigate to="/dashboard" replace /> : <Races />} />
       </Route>

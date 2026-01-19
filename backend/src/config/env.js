@@ -34,6 +34,10 @@ export const env = {
   // Defaults to TEAM_REPOSITORY when not specified.
   partRepository: process.env.PART_REPOSITORY || process.env.TEAM_REPOSITORY || "memory",
 
+  // Global simulation parameter: curve distance (km) for every curve.
+  // Matches DB defaults used in dbo.Track_Create (@CurveDistanceKm).
+  curveDistanceKm: process.env.CURVE_DISTANCE_KM ? Number(process.env.CURVE_DISTANCE_KM) : 0.3,
+
   // SQL Server connection (only used when USER_REPOSITORY=sqlserver)
   // Supports DB_SERVER as "localhost\\SQLEXPRESS" or separate DB_SERVER + DB_INSTANCE.
   db: (() => {
@@ -50,19 +54,19 @@ export const env = {
     return {
       server: serverOnly,
       instanceName,
-    database: process.env.DB_DATABASE || "F1GarageManager",
-    user: process.env.DB_USER || "sa",
-    password: process.env.DB_PASSWORD || "YourStrong!Passw0rd",
-    // For named instances, leaving port undefined allows SQL Browser lookup.
-    port: explicitPort ?? (instanceName ? undefined : 1433),
-    encrypt: (process.env.DB_ENCRYPT || "false").toLowerCase() === "true",
-    trustServerCertificate:
-      (process.env.DB_TRUST_SERVER_CERTIFICATE || "true").toLowerCase() === "true",
-    poolMax: process.env.DB_POOL_MAX ? Number(process.env.DB_POOL_MAX) : 10,
-    poolMin: process.env.DB_POOL_MIN ? Number(process.env.DB_POOL_MIN) : 0,
-    poolIdleTimeoutMillis: process.env.DB_POOL_IDLE_TIMEOUT_MS
-      ? Number(process.env.DB_POOL_IDLE_TIMEOUT_MS)
-      : 30000,
+      database: process.env.DB_DATABASE || "F1GarageManager",
+      user: process.env.DB_USER || "sa",
+      password: process.env.DB_PASSWORD || "YourStrong!Passw0rd",
+      // For named instances, leaving port undefined allows SQL Browser lookup.
+      port: explicitPort ?? (instanceName ? undefined : 1433),
+      encrypt: (process.env.DB_ENCRYPT || "false").toLowerCase() === "true",
+      trustServerCertificate:
+        (process.env.DB_TRUST_SERVER_CERTIFICATE || "true").toLowerCase() === "true",
+      poolMax: process.env.DB_POOL_MAX ? Number(process.env.DB_POOL_MAX) : 10,
+      poolMin: process.env.DB_POOL_MIN ? Number(process.env.DB_POOL_MIN) : 0,
+      poolIdleTimeoutMillis: process.env.DB_POOL_IDLE_TIMEOUT_MS
+        ? Number(process.env.DB_POOL_IDLE_TIMEOUT_MS)
+        : 30000,
     };
   })(),
 };

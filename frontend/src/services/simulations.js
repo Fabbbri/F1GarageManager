@@ -38,6 +38,21 @@ export async function listSimulationResults({
   );
 }
 
+// GET /simulations/my/results?trackId=&simulationId=&top=
+export async function listMySimulationResults({ trackId, simulationId, top = 200 } = {}) {
+  const qs = new URLSearchParams();
+  if (trackId) qs.set("trackId", trackId);
+  if (simulationId) qs.set("simulationId", simulationId);
+  qs.set("top", String(top));
+
+  return await handle(
+    await fetch(`${API_URL}/simulations/my/results?${qs.toString()}`, {
+      headers: headers(),
+      credentials: "include",
+    })
+  );
+}
+
 // POST /simulations  (aunque el botón esté deshabilitado)
 export async function createSimulation(payload) {
   return await handle(

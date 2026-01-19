@@ -15,6 +15,13 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -24,6 +31,8 @@ import { getSession } from "../services/auth";
 import { listTracks, createTrack, softDeleteTrack } from "../services/tracks";
 import { listDriversFinalized } from "../services/users";
 import { listSimulationResults, createSimulation } from "../services/simulations";
+import RaceSimulationAnimationDialog from "../components/RaceSimulationAnimationDialog";
+import CarSpecsDialog from "../components/CarSpecsDialog";
 
 // Tabs
 const TAB_SIM = "TAB_SIM";
@@ -41,6 +50,10 @@ export default function Races() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [simOverlayOpen, setSimOverlayOpen] = useState(false);
+  const [simOverlayMode, setSimOverlayMode] = useState("race"); // race | processing
+  const [simOverlayDurationMs, setSimOverlayDurationMs] = useState(7000);
+
   // DB data
   const [tracks, setTracks] = useState([]);
   const [drivers, setDrivers] = useState([]); // drivers finalizados
@@ -56,8 +69,10 @@ export default function Races() {
   const [simParticipants, setSimParticipants] = useState([]); // array of userId (drivers)
 
   const canStartSim = useMemo(() => {
-    return !!simTrackId && simParticipants.length >= 3;
-  }, [simTrackId, simParticipants]);
+    return isAdmin && !simOverlayOpen && !!simTrackId && simParticipants.length >= 3;
+  }, [isAdmin, simOverlayOpen, simTrackId, simParticipants]);
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- CREATE TRACK UI ---
   const [tName, setTName] = useState("");
@@ -79,6 +94,14 @@ export default function Races() {
   const [resDriverId, setResDriverId] = useState("");
   const [resSimulationId, setResSimulationId] = useState("");
   const [sortBy, setSortBy] = useState("points"); // points | time
+
+  const [carSpecsOpen, setCarSpecsOpen] = useState(false);
+  const [carSpecsResult, setCarSpecsResult] = useState(null);
+
+  const openCarSpecs = (r) => {
+    setCarSpecsResult(r);
+    setCarSpecsOpen(true);
+  };
 
   // helpers
   const trackById = useMemo(() => {
@@ -188,13 +211,48 @@ export default function Races() {
     setSimParticipants((prev) => prev.filter((id) => id !== driverId));
   };
 
-  const onStartSimulation = () => {
-    // NO hace nada aún
-    // (cuando lo conecten, deberían usar SPs:
-    //  dbo.Simulation_Create
-    //  dbo.Simulation_AddResult (por participante)
-    //  dbo.Simulation_SetPositionsAndPointsByTime)
-    setSuccess("Simulación lista (UI). El cálculo real lo implementan tus compañeros.");
+  const onStartSimulation = async () => {
+    let processingTimer;
+    try {
+      setError("");
+      setSuccess("");
+      if (!isAdmin) throw new Error("Solo ADMIN puede ejecutar simulaciones.");
+      if (!simTrackId) throw new Error("Seleccioná una pista.");
+      if (simParticipants.length < 3) throw new Error("Mínimo 3 participantes.");
+
+      // Animación 5–10s (y si la API tarda más, cambia a 'processing')
+      const durationMs = 5000 + Math.floor(Math.random() * 5001); // 5000..10000
+      setSimOverlayDurationMs(durationMs);
+      setSimOverlayMode("race");
+      setSimOverlayOpen(true);
+
+      const payload = { trackId: simTrackId, participants: simParticipants };
+      const apiPromise = createSimulation(payload);
+
+      processingTimer = setTimeout(() => {
+        setSimOverlayMode("processing");
+      }, durationMs);
+
+      // Asegura que la animación se vea al menos 5–10s
+      await sleep(durationMs);
+
+      const out = await apiPromise;
+
+      const simulationId = String(out?.simulation?.id || out?.simulationId || "");
+      setSuccess(simulationId ? `Simulación creada` : "Simulación creada.");
+
+      // Mostrar resultados de la carrera recién creada
+      setTab(TAB_RESULTS);
+      setResMode("race");
+      if (simulationId) setResSimulationId(simulationId);
+      await loadResults();
+    } catch (e) {
+      setError(e.message || "Error ejecutando simulación");
+    } finally {
+      if (processingTimer) clearTimeout(processingTimer);
+      setSimOverlayOpen(false);
+      setSimOverlayMode("race");
+    }
   };
 
 
@@ -258,10 +316,31 @@ export default function Races() {
     return arr;
   }, [results, sortBy]);
 
+  const formatTime = (seconds) => {
+    const s = Number(seconds);
+    if (!Number.isFinite(s) || s <= 0) return "—";
+    const total = Math.round(s);
+    const mm = Math.floor(total / 60);
+    const ss = total % 60;
+    return mm > 0 ? `${mm}:${String(ss).padStart(2, "0")}` : `${ss}s`;
+  };
+
   // render
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", p: 3 }}>
       <Stack spacing={2}>
+        <RaceSimulationAnimationDialog
+          open={simOverlayOpen}
+          mode={simOverlayMode}
+          durationMs={simOverlayDurationMs}
+        />
+
+        <CarSpecsDialog
+          open={carSpecsOpen}
+          onClose={() => setCarSpecsOpen(false)}
+          result={carSpecsResult}
+        />
+
         <Typography variant="h4" fontWeight={800}>
           Races
         </Typography>
@@ -366,7 +445,7 @@ export default function Races() {
 
 
                   <Typography variant="body2" color="text.secondary">
-                    Requisitos: pista seleccionada + mínimo 3 participantes.
+                    Requisitos: ADMIN + pista seleccionada + mínimo 3 participantes.
                   </Typography>
                 </Stack>
               </Stack>
@@ -491,7 +570,7 @@ export default function Races() {
                   )}
 
                   {resMode === "race" && (
-                    <TextField select fullWidth label="Carrera (simulationId)" value={resSimulationId} onChange={(e) => setResSimulationId(e.target.value)}>
+                    <TextField select fullWidth label="Carrera" value={resSimulationId} onChange={(e) => setResSimulationId(e.target.value)}>
                       <MenuItem value="">Seleccionar...</MenuItem>
                       {races.map((x) => (
                         <MenuItem key={x.simulationId} value={x.simulationId}>
@@ -509,41 +588,94 @@ export default function Races() {
                 ) : sortedResults.length === 0 ? (
                   <Typography color="text.secondary">Sin resultados.</Typography>
                 ) : (
-                  <Stack spacing={1}>
-                    {sortedResults.map((r, idx) => {
-                      const simulationId = String(r.simulationId ?? r.SimulationId ?? "");
-                      const trackId = String(r.trackId ?? r.TrackId ?? "");
-                      const driverId = String(r.driverUserId ?? r.DriverUserId ?? r.driverId ?? r.DriverId ?? "");
-                      const driver = driverById.get(driverId);
+                  <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: "transparent" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell><strong>Conductor</strong></TableCell>
+                          <TableCell><strong>Equipo</strong></TableCell>
+                          <TableCell align="right"><strong>Puntos</strong></TableCell>
+                          <TableCell align="right"><strong>Tiempo</strong></TableCell>
+                          <TableCell><strong>Pista</strong></TableCell>
+                          <TableCell><strong>Fecha</strong></TableCell>
+                          <TableCell align="center"><strong>Carro</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
 
-                      const points = Number(r.points ?? r.Points ?? 0);
-                      const time = Number(r.timeSec ?? r.TimeSeconds ?? r.totalSec ?? r.TotalSeconds ?? 0);
-                      const pos = Number(r.position ?? r.Position ?? 0);
+                      <TableBody>
+                        {sortedResults.map((r, idx) => {
+                          const simulationId = String(r.simulationId ?? r.SimulationId ?? "");
+                          const trackId = String(r.trackId ?? r.TrackId ?? "");
+                          const driverId = String(r.driverUserId ?? r.DriverUserId ?? r.driverId ?? r.DriverId ?? "");
+                          const driverName = r.driverName || driverById.get(driverId)?.name || driverId || "Driver";
 
-                      return (
-                        <Card key={`${simulationId}-${idx}`} variant="outlined">
-                          <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography fontWeight={800}>
-                                #{pos || idx + 1} • {driver?.name || driverId || "Driver"}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Pista: {trackById.get(trackId)?.name || trackId || "—"} •
-                                Carrera: {simulationId || "—"}
-                              </Typography>
-                            </Box>
+                          const teamName = r.teamName || "—";
+                 
+                          const points = Number(r.points ?? r.Points ?? 0);
+                          const timeSec = Number(r.timeSec ?? r.TimeSeconds ?? r.totalSec ?? r.TotalSeconds ?? 0);
+                          const trackName = r.trackName || trackById.get(trackId)?.name || trackId || "—";
+                          const startedAt = r.startedAt || "";
+                          const dateLabel = startedAt ? new Date(startedAt).toLocaleString() : "—";
 
-                            <Stack alignItems="flex-end">
-                              <Typography fontWeight={800}>{points} pts</Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {time ? `${time.toFixed(2)} s` : "—"}
-                              </Typography>
-                            </Stack>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </Stack>
+                          const hasSpecs = !!(
+                            r.carId ||
+                            r.CarId ||
+                            r.totalP != null ||
+                            r.TotalP != null ||
+                            r.vRecta != null ||
+                            r.VRecta != null
+                          );
+
+                          // normalize object fields for dialog
+                          const normalized = {
+                            ...r,
+                            simulationId,
+                            trackId,
+                            teamId: r.teamId ?? r.TeamId ?? null,
+                            driverUserId: driverId,
+                            driverName,
+                            teamName,
+                            trackName,
+                            startedAt,
+                            carId: r.carId || r.CarId || null,
+                            timeSec,
+                            totalP: r.totalP ?? r.TotalP ?? null,
+                            totalA: r.totalA ?? r.TotalA ?? null,
+                            totalM: r.totalM ?? r.TotalM ?? null,
+                            totalH: r.totalH ?? r.TotalH ?? null,
+                            vRecta: r.vRecta ?? r.VRecta ?? null,
+                            vCurva: r.vCurva ?? r.VCurva ?? null,
+                            penaltySeconds: r.penaltySeconds ?? r.PenaltySeconds ?? null,
+                          };
+
+                          return (
+                            <TableRow key={`${simulationId}-${driverId}-${idx}`} hover>
+                              <TableCell>{driverName}</TableCell>
+                              <TableCell>{teamName}</TableCell>
+                              <TableCell align="right">{points}</TableCell>
+                              <TableCell align="right">{formatTime(timeSec)}</TableCell>
+                              <TableCell>{trackName}</TableCell>
+                              <TableCell>
+                                <Typography variant="body2" sx={{ lineHeight: 1.2 }}>
+                                  {dateLabel}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  disabled={!hasSpecs}
+                                  onClick={() => openCarSpecs(normalized)}
+                                >
+                                  Ver carro
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
               </Stack>
             </CardContent>

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "../services/auth";
-import { listTeams, getTeam, getDriverStats } from "../services/teams";
+import { listTeams, getTeam } from "../services/teams";
 import { listParts } from "../services/parts";
+import { listMySimulationResults } from "../services/simulations";
 import {
   Box,
   Card,
@@ -93,7 +94,6 @@ export default function Dashboard() {
   const [parts, setParts] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
 
-  const [driverTeamId, setDriverTeamId] = useState("");
   const [driverStats, setDriverStats] = useState(null);
 
   useEffect(() => {
@@ -105,20 +105,32 @@ export default function Dashboard() {
       try {
         // DRIVER dashboard
         if (isDriver) {
-          const tList = await listTeams();
+          const data = await listMySimulationResults({ top: 200 });
           if (!alive) return;
 
-          const t = Array.isArray(tList) && tList.length ? tList[0] : null;
-          setDriverTeamId(String(t?.id || ""));
+          const rows = Array.isArray(data?.results) ? data.results : [];
+          // sort by startedAt desc (fallback stable)
+          rows.sort((a, b) => String(b?.startedAt || "").localeCompare(String(a?.startedAt || "")));
 
-          if (!t?.id || !session?.id) {
-            setDriverStats(null);
-            return;
-          }
+          const races = rows.length;
+          const totalPoints = rows.reduce((s, r) => s + Number(r?.points ?? 0), 0);
+          const positions = rows
+            .map((r) => Number(r?.position))
+            .filter((x) => Number.isFinite(x) && x > 0);
 
-          const stats = await getDriverStats(t.id, session.id);
-          if (!alive) return;
-          setDriverStats(stats);
+          const avgPosition = positions.length ? positions.reduce((s, x) => s + x, 0) / positions.length : 0;
+          const bestPosition = positions.length ? Math.min(...positions) : null;
+          const avgPoints = races ? totalPoints / races : 0;
+
+          const mapped = rows.map((r) => ({
+            id: r.resultId || `${r.simulationId}-${r.trackId}`,
+            race: r.trackName || `Carrera ${String(r.simulationId || "").slice(0, 8)}`,
+            date: r.startedAt || null,
+            position: Number(r.position ?? 0) || null,
+            points: Number(r.points ?? 0) || 0,
+          }));
+
+          setDriverStats({ races, totalPoints, avgPosition, bestPosition, avgPoints, results: mapped });
           return;
         }
 
@@ -249,8 +261,8 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {!driverTeamId ? (
-              <Alert severity="info">No tenés equipo asignado: no hay resultados aún.</Alert>
+            {!driverStats?.races ? (
+              <Alert severity="info">Aún no tenés resultados de carreras.</Alert>
             ) : null}
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -295,7 +307,7 @@ export default function Dashboard() {
                         key={r.id || `${r.date}-${r.race}-${r.position}-${r.points}`}
                         color="text.secondary"
                       >
-                        • {r.race} • {new Date(r.date).toLocaleDateString()} • pos {r.position} • {r.points} pts
+                        • {r.race} • {r.date ? new Date(r.date).toLocaleDateString() : "sin fecha"} • pos {r.position ?? "—"} • {r.points} pts
                       </Typography>
                     ))}
                   </Stack>
@@ -308,9 +320,7 @@ export default function Dashboard() {
             <Card>
               <CardContent>
                 <Typography fontWeight={900} sx={{ mb: 1 }}>Estadísticas</Typography>
-                {!driverTeamId ? (
-                  <Typography color="text.secondary">Sin equipo asignado: no hay estadísticas aún.</Typography>
-                ) : !driverStats ? (
+                {!driverStats ? (
                   <Typography color="text.secondary">No hay estadísticas disponibles aún.</Typography>
                 ) : (
                   <Stack spacing={0.5}>
