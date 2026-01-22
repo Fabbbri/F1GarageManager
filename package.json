@@ -1,0 +1,21 @@
+{
+  "name": "f1garagemanager",
+  "version": "1.0.0",
+  "description": "F1GarageManager es una aplicación web para la **gestión de equipos de Fórmula 1**, que permite administrar escuderías, presupuestos, patrocinadores, inventario, carros y conductores.  \r El proyecto está dividido en **frontend (React)** y **backend (Node.js)**, comunicándose mediante una **API REST**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fabbbri/F1GarageManager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Fabbbri/F1GarageManager/issues"
+  },
+  "homepage": "https://github.com/Fabbbri/F1GarageManager#readme"
+}

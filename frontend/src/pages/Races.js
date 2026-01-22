@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { getGrafanaLinks } from "../services/grafana";
 import {
   Box,
   Card,
@@ -38,6 +39,8 @@ import CarSpecsDialog from "../components/CarSpecsDialog";
 const TAB_SIM = "TAB_SIM";
 const TAB_TRACKS = "TAB_TRACKS";
 const TAB_RESULTS = "TAB_RESULTS";
+const TAB_GRAFANA = "TAB_GRAFANA";
+
 
 const CURVE_DISTANCE_KM = 0.3;
 
@@ -62,6 +65,11 @@ export default function Races() {
   const [loadingTracks, setLoadingTracks] = useState(true);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loadingResults, setLoadingResults] = useState(true);
+
+  // GRAFANA
+  const [grafanaLinks, setGrafanaLinks] = useState([]);
+  const [loadingGrafanaLinks, setLoadingGrafanaLinks] = useState(true);
+
 
   // --- SIMULATION UI ---
   const [simTrackId, setSimTrackId] = useState("");
@@ -109,6 +117,31 @@ export default function Races() {
     (tracks || []).forEach((t) => m.set(String(t.id), t));
     return m;
   }, [tracks]);
+
+  function cleanGrafanaTitle(title = "") {
+    return String(title)
+      .replace(/\(10\.1\)/gi, "")
+      .replace(/10\.1/gi, "")
+      .replace(/\bPanel\s*3[B-E]\s*-\s*/gi, "Panel ")
+      .replace(/\b3[B-E]\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function prettyGrafanaTitle(t = "") {
+    const s = String(t).toLowerCase();
+    if (s.includes("dashboard")) return "Dashboard";
+    if (s.includes("ranking")) return "Ranking";
+    if (s.includes("setups")) return "Setups vs Tiempo";
+    if (s.includes("tiempo")) return "Tiempo por carro";
+    if (s.includes(" p ")) return "Potencia por carro";
+    if (s.includes(" a ")) return "Aerodinámica por carro";
+    if (s.includes(" m ")) return "Manejo por carro";
+    return cleanGrafanaTitle(t);
+  }
+
+
+
 
   const driverById = useMemo(() => {
     const m = new Map();
@@ -170,6 +203,21 @@ export default function Races() {
     }
   }
 
+  async function loadGrafanaLinks() {
+    if (!isAdmin) {
+      setLoadingGrafanaLinks(false);
+      return;
+    }
+    setLoadingGrafanaLinks(true);
+    try {
+      const data = await getGrafanaLinks();
+      setGrafanaLinks(data.links || []);
+    } finally {
+      setLoadingGrafanaLinks(false);
+    }
+  }
+
+
   // LOAD inicial
   useEffect(() => {
     (async () => {
@@ -178,6 +226,7 @@ export default function Races() {
       try {
         await Promise.all([loadTracks(), loadDrivers()]);
         await loadResults();
+        await loadGrafanaLinks();
       } catch (e) {
         setError(e.message || "Error cargando datos");
       }
@@ -348,12 +397,14 @@ export default function Races() {
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
+
         <Card>
           <CardContent>
             <Tabs value={tab} onChange={(_, v) => setTab(v)}>
               <Tab label="Simulación" value={TAB_SIM} />
               <Tab label="Creación de pistas" value={TAB_TRACKS} />
               <Tab label="Resultados" value={TAB_RESULTS} />
+              <Tab label="Grafana" value={TAB_GRAFANA} />
             </Tabs>
           </CardContent>
         </Card>
@@ -676,6 +727,53 @@ export default function Races() {
                       </TableBody>
                     </Table>
                   </TableContainer>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
+        {/* ====================== GRAFANA ====================== */}
+        {tab === TAB_GRAFANA && (
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography fontWeight={800}>Grafana</Typography>
+
+                {!isAdmin && (
+                  <Alert severity="info">
+                    Solo ADMIN puede ver esta sección.
+                  </Alert>
+                )}
+
+                {isAdmin && (
+                  <>
+                    <Typography variant="body2" color="text.secondary">
+                      Accesos directos a dashboards y paneles de análisis.
+                    </Typography>
+
+                    {loadingGrafanaLinks ? (
+                      <Typography color="text.secondary">Cargando links...</Typography>
+                    ) : (grafanaLinks || []).length === 0 ? (
+                      <Alert severity="warning">
+                        No hay links configurados.
+                      </Alert>
+                    ) : (
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {(grafanaLinks || []).map((l) => (
+                          <Button
+                            key={l.url}
+                            variant="outlined"
+                            href={l.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            sx={{ mb: 1 }}
+                          >
+                            {prettyGrafanaTitle(l.title)}
+                          </Button>
+                        ))}
+                      </Stack>
+                    )}
+                  </>
                 )}
               </Stack>
             </CardContent>

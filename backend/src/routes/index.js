@@ -43,6 +43,13 @@ import { makeSimulationController } from "../controllers/simulation.controller.j
 import { SimulationService } from "../services/simulation.service.js";
 import { SqlServerSimulationRepository } from "../repositories/sqlserver.simulation.repository.js";
 
+// GRAFANA
+import { makeAdminRepository } from "../repositories/admin.repository.js";
+import { makeAdminService } from "../services/admin.service.js";
+import { makeAdminController } from "../controllers/admin.controller.js";
+import { makeAdminRoutes } from "./admin.routes.js";
+
+
 
 const router = Router();
 
@@ -59,6 +66,14 @@ router.use("/auth", makeAuthRoutes(authController));
 const userService = new UserService(userRepo);
 const userController = makeUserController(userService);
 router.use("/users", makeUserRoutes(userController));
+
+// GRAFANA
+const adminRepository = makeAdminRepository();
+const adminService = makeAdminService(adminRepository);
+const adminController = makeAdminController(adminService);
+
+router.use("/admin", makeAdminRoutes(adminController));
+
 
 // PARTS (store catalog)
 const seedParts = [
