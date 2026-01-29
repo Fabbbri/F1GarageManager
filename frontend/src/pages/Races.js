@@ -42,7 +42,7 @@ const TAB_RESULTS = "TAB_RESULTS";
 const TAB_GRAFANA = "TAB_GRAFANA";
 
 
-const CURVE_DISTANCE_KM = 0.3;
+const CURVE_DISTANCE_KM = 0.2;
 
 export default function Races() {
   const session = getSession();
@@ -94,7 +94,7 @@ export default function Races() {
   }, [tCurves]);
 
   // Regla fija (igual a SP). Si la tenés en otro lado, ajustala.
-  const CURVE_FIXED_KM = 0.3;
+  const CURVE_FIXED_KM = 0.2;
 
   // --- RESULTS UI ---
   const [resMode, setResMode] = useState("general"); // general | track | driver | race

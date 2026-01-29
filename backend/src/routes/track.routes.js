@@ -18,7 +18,7 @@ export function makeTrackRoutes(trackController) {
   );
 
   r.delete("/:id", requireAuth, requireRole("ADMIN"), (req, res, next) =>
-    trackController.remove(req, res, next)
+    trackController.softDelete(req, res, next)
   );
 
   return r;
